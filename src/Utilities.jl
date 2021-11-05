@@ -1,5 +1,5 @@
 
-#kinship, rotate, initial values, random seeds,
+#kinship, rotate, initialization +L, random seeds,
 
 
 """
