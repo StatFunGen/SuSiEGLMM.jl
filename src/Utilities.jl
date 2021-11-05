@@ -4,7 +4,7 @@
 
 """
   
-    Rotation(y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float64},K::Matrix{Float64})
+    rotate(y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float64},K::Matrix{Float64})
 
 Returns eigenvalues of a kinship matrix, and transformed data rotated by eigenvectors.
 
@@ -23,7 +23,7 @@ Returns eigenvalues of a kinship matrix, and transformed data rotated by eigenve
 - `Eigen values` 
 
 """
-function Rotation(y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float64},K::Matrix{Float64})
+function rotate(y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float64},K::Matrix{Float64})
     
     n=length(y)
     #spectral decomposition
@@ -39,7 +39,7 @@ function Rotation(y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float64},K:
 end
 
 #compute X'y 
-function Xy(Xt::Matrix{Float64},yt::Vector{Float64})
+function getXy(Xt::Matrix{Float64},yt::Vector{Float64})
     
     y1= BLAS.gemv('T',Xt,yt)
     
