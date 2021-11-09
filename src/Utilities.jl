@@ -1,5 +1,5 @@
 
-#kinship, rotate, initialization +L, random seeds,
+#kinship, rotate, random seeds,
 
 
 """
@@ -10,14 +10,14 @@ Returns eigenvalues of a kinship matrix, and transformed data rotated by eigenve
 
 # Arguments
 
-- `y` : a binary trait
-- `X` : genetic markers selected from QTL analysis
-- `X₀` : covariates
-- `K` : a genetic kinship (symmetric pdf)
+- `y` : a vector of n x 1 binary trait
+- `X` : a n x p matrix of genetic markers selected from QTL analysis
+- `X₀` : a matrix of n x c covariates including intercepts
+- `K` : a matrix of n x n genetic kinship (symmetric pdf)
 
 # Output
 
-- `yt` :
+- `yt` : 
 - `Xt` :
 - `Xt₀` :
 - `Eigen values` 
@@ -38,21 +38,15 @@ function rotate(y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float64},K::M
     
 end
 
-#compute X'y 
-function getXy(Xt::Matrix{Float64},yt::Vector{Float64})
+#compute X'y : 't': 'T' for transpose, 'N' for no transpose
+function getXy(Xt::Matrix{Float64},yt::Vector{Float64},t::Char)
     
-    y1= BLAS.gemv('T',Xt,yt)
+    y1= BLAS.gemv(t,Xt,yt)
     
     return y1
 
 
-function ELBO()
-    
-   # log.(logistic.(ξ))- 0.5*ξ+ yX*β
-        
- 
-    
-end
+
 
 
 
