@@ -2,14 +2,18 @@
 #kinship, rotate, random seeds,
 
 #Spectral decomposition
-function eigenK(K::Union{Array{Float64,3},Matrix{Float64}};LOCO::Bool=true)
+function eigenK(K::Union{Array{Float64,3},Matrix{Float64}};LOCO::Bool=true,ρ::Float64=0.001)
     
    if (LOCO)
        chr = size(K,3); 
        S = zeros(n,nchr);
        T = zeros(n,n,chr);
     
-        for j =1:nchr
+        for j =1:nchr ## add parallelization later
+           if(!isposdef(K[:,:,j])) # check pdf
+                K[:,:,j]=K[:,:,j]+ (abs(eigmin(K[:,:,j]))+ρ)
+           end
+                
        #spectral decomposition
          F=eigen(K[:,:,j])
          T[:,:,j], S[:,j] = F.vectors, F.values
@@ -17,7 +21,9 @@ function eigenK(K::Union{Array{Float64,3},Matrix{Float64}};LOCO::Bool=true)
        
         return  T, S
     else
-        
+          if(!isposdef(K)) # check pdf
+                K=K+ (abs(eigmin(K))+ρ)
+           end
         F=eigen(K)
         return F.vectors, F.values
         
@@ -50,6 +56,20 @@ Returns eigenvalues of a kinship matrix, and transformed data rotated by eigenve
 
 """
 function rotate(y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float64},T::Matrix{Float64})
+    
+    n=length(y)
+    
+    #U'X, U'X₀, U'(y-1/2)
+    yt= BLAS.gemv('T',T,(y-0.5*ones(n)))
+    Xt=BLAS.gemm('T','N',T,X)
+    Xt₀=BLAS.gemm('T','N',T,X₀)
+       
+    return yt, Xt, Xt₀
+    
+end
+
+
+function rotate(y::Vector{Float64},X₀::Matrix{Float64},T::Matrix{Float64})
     
     n=length(y)
     
