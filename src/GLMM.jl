@@ -18,17 +18,21 @@ Returns initial values for parameters τ2, β, ξ to run SuSiEGLMM
 
 
 """
-function init(y,X::GenoData,T::Union{Matrix{Float64},Array{Float64,3}},
-        S::Union{Matrix{Float64},Vector{Float64}};X₀)
+function init(y::Vector{Float64},X::GenoData,T::Union{Matrix{Float64},Array{Float64,3}},
+        S::Union{Matrix{Float64},Vector{Float64}};X₀::Matrix{Float64}=ones(length(y),1),tol=1e-4)
     
      τ2 = rand(1)*0.5; #arbitray
-    # need to change
+    # may need to change
      β = zeros(axes(X₀,2)) 
      ξ = rand(n)
+     
+  
+        
+        # for j= eachindex(Chr)
+      yt, Xt₀ = rotate(y,X₀,T)  
+     res= emGLMM(yt,Xt₀,S,τ2,β,ξ;tol=tol)
     
-     res= emGLMM(yt,Xt₀,S,τ2,β,ξ;tol::Float64=1e-4)
-    
-
+    return res
     
     
 end
@@ -79,15 +83,31 @@ struct GenoInfo
 end
 
 
-function fineMapping(f::Function,x...)
-            
-            
-            
-    est= @distributed (vcat) for j=1:nchr   
-        res = f(x...)
-        res
-        end
+function fineMapping()
     
-    return est
+     #need to work more   
+      Chr 
+     init()
+    
+   est= @distributed (vcat) for j= eachindex(Chr)
+          est0 = fineMapping1()
+            est0
+    end
+    
+    
+    
+    
+end
+
+
+
+
+function fineMapping1(f::Function,args...;kwargs...)                   
+        
+  #need to work more           
+        res = f(args...;kwargs...)
+    
+    
+    return res
         
 end

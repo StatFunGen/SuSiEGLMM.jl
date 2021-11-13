@@ -75,10 +75,10 @@ function rotate(y::Vector{Float64},X₀::Matrix{Float64},T::Matrix{Float64})
     
     #U'X, U'X₀, U'(y-1/2)
     yt= BLAS.gemv('T',T,(y-0.5*ones(n)))
-    Xt=BLAS.gemm('T','N',T,X)
+    # Xt=BLAS.gemm('T','N',T,X)
     Xt₀=BLAS.gemm('T','N',T,X₀)
        
-    return yt, Xt, Xt₀
+    return yt, Xt₀
     
 end
 
