@@ -22,7 +22,7 @@ using Statistics, LinearAlgebra, Random, StatsBase, Distributions
 
 #posterior
 
-#g
+#g for a full model
 function postG!(ghat::Vector{Float64},Vg::Vector{Float64},λ::Vector{Float64},
 yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{Float64},S::Vector{Float64},
         β::Vector{Float64},ξ::Vector{Float64},τ2::Float64,A0::Matrix{Float64},B0::Matrix{Float64})
@@ -37,6 +37,22 @@ yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{Float64},S::Vector{Float64
     
     
 end
+
+# for initial values
+function postG!(ghat::Vector{Float64},Vg::Vector{Float64},λ::Vector{Float64},
+yt::Vector{Float64},Xt₀::Matrix{Float64},S::Vector{Float64},
+        β::Vector{Float64},ξ::Vector{Float64},τ2::Float64)
+    
+    
+    λ[:]= 2Lambda.(ξ)
+    
+    #posterior
+    Vg[:]= 1.0./(λ+1.0./(τ2*S))
+    
+    ghat[:]= Diagonal(Vg)*(yt-λ.*(gemv('N',Xt₀,β) ))
+    
+end
+
 
 #EM for g
 function emG(Vg::Vector{Float64},ghat::Vector{Float64},S::Vector{Float64})
@@ -112,28 +128,35 @@ end
 
 
 #Xy = getXy(Xt,yt)
-# M-step
-
+# M-step: H1
 function mStep!(ξ_new::Vector{Float64},β_new::Vector{Float64},A1::Matrix{Float64},B1::Matrix{Float64},
         ghat::Vector{Float64},ghat2::Vector{Float64},λ::Vector{Float64},
         yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{Float64},β::Vector{Float64})
     
     # ξ_new= zeros(axes(yt))
     # β_new= zeros(axes(Xt₀,2))
+    ŷ₀ = getXy(Xt₀,β,'N')
     
-     for i= eachindex(yt)
-    ξ_new[i] = (Xt₀*β).^2 + Xt*sum(AB2,dims=2) + ghat2 + 2*(Xt₀*β +ghat).*(Xt*sum(A1.*B1,dims=2))
-    ξ_new[i]= sqrt.(ξ_new[i])
-    end
-     
+  
+    ξ_new[:] = sqrt.(ŷ₀.^2 + Xt*sum(AB2,dims=2) + ghat2 + 2(ŷ₀ +ghat).*(Xt*sum(A1.*B1,dims=2))+ 2(ŷ₀.*ghat)) 
+    β_new[:]= BLAS.gemm('T','N',Xt₀,(λ.*Xt₀))\BLAS.gemv('T',Xt₀,(yt- λ.*(Xt*sum(A1.*B1,dims=2) + ghat)))
         
-        β_new[:]= BLAS.gemm('T','N',Xt₀,(λ.*Xt₀))\BLAS.gemv('T',Xt₀,(yt- λ.*(Xt*sum(A1.*B1,dims=2) + ghat)))
+end
+
+
+#M-step: H0 for initial values
+function mStep!(ξ_new::Vector{Float64},β_new::Vector{Float64},
+        ghat::Vector{Float64},ghat2::Vector{Float64},λ::Vector{Float64},
+        yt::Vector{Float64},Xt₀::Matrix{Float64},β::Vector{Float64})
     
-    
+    ξ_new[:] = sqrt.(ŷ₀.^2 + ghat2 + 2(ŷ₀.*ghat)) 
+    β_new[:]= BLAS.gemm('T','N',Xt₀,(λ.*Xt₀))\BLAS.gemv('T',Xt₀,(yt- λ.*ghat))
+            
 end
 
 
 
+# for a full model
 function ELBO(L::Int64,ξ_new::Vector{Float64},β_new::Vector{Float64},σ0_new::Vector{Float64},τ2_new::Float64,
         A1::Matrix{Float64},B1::Matrix{Float64},AB2::Matrix{Float64},Sig1::Matrix{Float64},Π::Vector{Float64},
         ghat2::Vector{Float64},Vg::Vector{Float64},S::Vector{Float64},yt::Vector{Float64},Xt₀::Matrix{Float64})
@@ -157,12 +180,23 @@ function ELBO(L::Int64,ξ_new::Vector{Float64},β_new::Vector{Float64},σ0_new::
             
 end
     
+# For initial values
+function ELBO(ξ_new::Vector{Float64},β_new::Vector{Float64},τ2_new::Float64,
+        ghat2::Vector{Float64},Vg::Vector{Float64},S::Vector{Float64},yt::Vector{Float64},Xt₀::Matrix{Float64})
+   
+    n=length(yt);
+    ll= sum(log.(logistic.(ξ))- 0.5*ξ+ yt'*gemv('N',Xt₀,β_new)) #lik
+    gl = -0.5*(n*log(τ2_new)+ sum(log.(S./Vg))- 1.0) - sum(ghat2/.S)/τ2_new # g
+    
+    return ll+gl
+    
+end
 
 
 
 struct Result
     ξ::Vector{Float64}
-    β ::Vector{Float64}
+    β::Vector{Float64}
     σ0::Vector{Float64}
     τ2::Float64
     α::Matrix{Float64}
@@ -173,8 +207,8 @@ end
     
  
 
-
-function emLMM(L,yt,Xt,Xt₀,S,τ2,β,ξ,σ0,Π;tol::Float64=1e-4)
+# EM for a full model
+function emGLMM(L,yt,Xt,Xt₀,S,τ2,β,ξ,σ0,Π;tol::Float64=1e-4)
     
     n, p = size(Xt)
     ghat =zeros(n); Vg = zeros(n); λ = zeros(n)
@@ -210,6 +244,58 @@ function emLMM(L,yt,Xt,Xt₀,S,τ2,β,ξ,σ0,Π;tol::Float64=1e-4)
     return Result(ξ,β,σ0,τ2,A1, B1, AB2, Sig1)
         
 end
+
+
+
+struct result
+    ξ::Vector{Float64}
+    β::Vector{Float64}
+    τ2::Float64
+end
+
+
+
+#EM for initial values
+function emGLMM(yt,Xt₀,S,τ2,β,ξ;tol::Float64=1e-4)
+    
+    
+    n, p = size(Xt)
+    ghat =zeros(n); Vg = zeros(n); λ = zeros(n)
+    
+    ghat2=zeros(axes(S)); τ2_new=zero(eltype(S)); 
+    ξ_new = zeros(n); β_new=zeros(axes(β))
+    
+    crit =1.0; el0=0.0;numitr=1
+      
+    
+    while (crit>=tol)
+        ###check again!
+         postG!(ghat,Vg,λ,yt,Xt₀,S,β,ξ,τ2)
+         ghat2, τ2_new = emG(Vg,ghat,S)
+         
+         mStep!(ξ_new,β_new,ghat,ghat2,λ,yt,Xt₀,β)
+        
+         el1=ELBO(ξ_new,β_new,τ2_new,ghat2,Vg,S,yt,Xt₀)
+     
+         crit=el1-el0 
+         
+         ξ=ξ_new;β=β_new; τ2=τ2_new;el0=el1
+        
+          numitr +=1        
+    end
+    
+    return result(ξ,β,τ2)
+        
+    
+    
+    
+end
+
+
+
+
+
+
 
 # # drawing initial values 
 # function initialValues(p::Int64, L::Int64 σ0::Vector{Float64})
