@@ -208,7 +208,8 @@ end
  
 
 # EM for a full model
-function emGLMM(L,yt,Xt,Xt₀,S,τ2,β,ξ,σ0,Π;tol::Float64=1e-4)
+function emGLMM(L::Int64,yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{Float64},S::Vector{Float64},τ2::Float64,
+        β::Vector{Float64},ξ::Vector{Float64},σ0::Vector{Float64},Π::Vector{Float64};tol::Float64=1e-4)
     
     n, p = size(Xt)
     ghat =zeros(n); Vg = zeros(n); λ = zeros(n)
@@ -233,6 +234,8 @@ function emGLMM(L,yt,Xt,Xt₀,S,τ2,β,ξ,σ0,Π;tol::Float64=1e-4)
          el1=ELBO(L,ξ_new,β_new,σ0_new,τ2_new,A1,B1,AB2,Sig1,Π,ghat2,Vg,S,yt,Xt₀)
      
          crit=el1-el0 
+         #check later for performance
+         ##crit=norm(ξ_new-ξ)+norm(β_new-β)+abs(τ2_new-τ2)+abs(el1-el0) 
          
          ξ=ξ_new;β=β_new;σ0=σ0_new; τ2=τ2_new;el0=el1
         
@@ -247,7 +250,7 @@ end
 
 
 
-struct result
+struct Null_est
     ξ::Vector{Float64}
     β::Vector{Float64}
     τ2::Float64
@@ -259,7 +262,7 @@ end
 function emGLMM(yt,Xt₀,S,τ2,β,ξ;tol::Float64=1e-4)
     
     
-    n, p = size(Xt)
+    n = length(yt)
     ghat =zeros(n); Vg = zeros(n); λ = zeros(n)
     
     ghat2=zeros(axes(S)); τ2_new=zero(eltype(S)); 
@@ -278,13 +281,14 @@ function emGLMM(yt,Xt₀,S,τ2,β,ξ;tol::Float64=1e-4)
          el1=ELBO(ξ_new,β_new,τ2_new,ghat2,Vg,S,yt,Xt₀)
      
          crit=el1-el0 
-         
+         #crit=norm(ξ_new-ξ)+norm(β_new-β)+abs(τ2_new-τ2)  
+        
          ξ=ξ_new;β=β_new; τ2=τ2_new;el0=el1
         
           numitr +=1        
     end
     
-    return result(ξ,β,τ2)
+    return Null_est(ξ,β,τ2)
         
     
     
