@@ -2,7 +2,7 @@
 #kinship, rotate, random seeds,
 
 #Spectral decomposition
-function eigenK(K::Union{Array{Float64,3},Matrix{Float64}};LOCO::Bool=true,ρ::Float64=0.001)
+function eigenK(K::Union{Array{Float64,3},Matrix{Float64}};LOCO::Bool=true,δ::Float64=0.001)
     
    if (LOCO)
        chr = size(K,3); 
@@ -11,7 +11,7 @@ function eigenK(K::Union{Array{Float64,3},Matrix{Float64}};LOCO::Bool=true,ρ::F
     
         for j =1:nchr ## add parallelization later
            if(!isposdef(K[:,:,j])) # check pdf
-                K[:,:,j]=K[:,:,j]+ (abs(eigmin(K[:,:,j]))+ρ)
+                K[:,:,j]=K[:,:,j]+ (abs(eigmin(K[:,:,j]))+δ)*I
            end
                 
        #spectral decomposition
@@ -22,7 +22,7 @@ function eigenK(K::Union{Array{Float64,3},Matrix{Float64}};LOCO::Bool=true,ρ::F
         return  T, S
     else
           if(!isposdef(K)) # check pdf
-                K=K+ (abs(eigmin(K))+ρ)
+                K=K+ (abs(eigmin(K))+δ)*I
            end
         F=eigen(K)
         return F.vectors, F.values
@@ -36,9 +36,9 @@ end
 
 """
   
-    rotate(y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float64},K::Matrix{Float64})
+    rotate(y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float64},T::Matrix{Float64})
 
-Returns eigenvalues of a kinship matrix, and transformed data rotated by eigenvectors.
+Returns transformed data rotated by eigenvectors.
 
 # Arguments
 
@@ -56,29 +56,36 @@ Returns eigenvalues of a kinship matrix, and transformed data rotated by eigenve
 
 """
 function rotate(y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float64},T::Matrix{Float64})
+
+    Xt= rotateX(X,T)
+    Xt₀=rotateX(X₀,T)
+    yt= rotateY(y,T)
     
-    n=length(y)
+    return Xt, Xt₀, yt
+
+
+end
+
+function rotateX(X::Matrix{Float64},T::Matrix{Float64})
     
-    #U'X, U'X₀, U'(y-1/2)
-    yt= BLAS.gemv('T',T,(y-0.5*ones(n)))
+    
+    #U'X, U'X₀,U'(y-1/2)
+    
     Xt=BLAS.gemm('T','N',T,X)
-    Xt₀=BLAS.gemm('T','N',T,X₀)
        
-    return yt, Xt, Xt₀
+    return Xt
     
 end
 
 
-function rotate(y::Vector{Float64},X₀::Matrix{Float64},T::Matrix{Float64})
+function rotateY(y::Vector{Float64},T::Matrix{Float64})
     
     n=length(y)
     
     #U'X, U'X₀, U'(y-1/2)
     yt= BLAS.gemv('T',T,(y-0.5*ones(n)))
-    # Xt=BLAS.gemm('T','N',T,X)
-    Xt₀=BLAS.gemm('T','N',T,X₀)
        
-    return yt, Xt₀
+    return yt
     
 end
 
