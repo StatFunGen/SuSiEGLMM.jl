@@ -13,11 +13,28 @@ function init(yt::Vector{Float64},Xt₀::Matrix{Float64},S::Vector{Float64};tol=
         
 end
 
+
+
+"""
+
+    GenoInfo(snp::Array{String,1},chr::Array{Any,1},pos::Array{Float64,1})
+
+A type struct includes information on genotype data
+
+# Arguements
+
+- `snp` : a vector of strings for genetic marker (or SNP) names
+- `chr` : a vector of Chromosome information corresponding to `snp`
+- `pos` : a vector of `snp` position in `cM`
+
+"""
 struct GenoInfo
     snp::Array{String,1}
     chr::Array{Any,1}
     pos::Array{Float64,1} #positon 
 end
+
+
 
 
 """
@@ -27,10 +44,11 @@ end
 
 Returns initial values for parameters `τ2, β, ξ` to run fine-mapping for SuSiEGLMM.
 
+
 # Arguments
 
-- `y` : a vector of n x 1 binary trait
-- `X₀` : a matrix of n x c covariates.  The intercept is default if no covariates is added.
+- `y` : a n x 1 vector of binary trait
+- `X₀` : a n x c matrix of covariates.  The intercept is default if no covariates is added.
 - `T` : a matrix of eigen-vectors by eigen decomposition to K (kinship)
 - `S` : a vecor of eigen-values by eigen decomposition to K (kinship)
 
@@ -41,9 +59,13 @@ Returns initial values for parameters `τ2, β, ξ` to run fine-mapping for SuSi
 
 # Output
 
-- `Xt₀`: a transformed covariate matrix
+- `Xt₀`: a n x c transformed covariate matrix
 - `yt`: a transformed trait vector
-- `init_est` : Type `Null_est`, i.e. initial values of parameters `τ2,β,ξ` obtained by EM algorithm
+-  Type of struct, `Null_est` :  initial values of parameters obtained by EM algorithm, or a null model of the SuSiE-GLMM excluding SuSiE implementation.  It includes following estimates: 
+
+    - `τ2` : a constant variance in the variance component of genetic relatedness, `τ²K`, where K is a kinship matrix
+    -  `β` : a c x 1 vector of fixed effects for covariates
+    -  `ξ` : a n x 1 vector of variational parameters to fit a mixed logitstic function
 
 """
 function initialization(y::Vector{Float64},X₀::Union{Matrix{Float64},Vector{Float64}}=ones(length(y),1),T::Matrix{Float64},
@@ -77,7 +99,54 @@ function SuSiEGLMM(L::Int64,Π::Vector{Float64},yt::Vector{Float64},Xt::Matrix{F
     
 end 
 
-function fineMapping_GLMM(G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float64},Vector{Float64}}=ones(length(y),1),
+
+function nullSuSiE_GLMM()
+    
+    
+    
+    
+end
+
+"""
+
+    fineMapping_GLMM(G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float64},Vector{Float64}}=ones(length(y),1),
+        T::Union{Array{Float64,3},Matrix{Float64}},S::Union{Matrix{Float64},Vector{Float64}};LOCO::Bool=true,tol=1e-4)
+
+Performs fine-mapping analysis based on SuSiE (Sum of Single Effects model) for a generalized linear mixed model for a binary trait (logistic mixed model).
+
+
+
+# Arguments
+
+- `G` : a Type of struct, `GenoInfo`. See [`GenoInfo`](@ref).
+- `y` : a n x 1 vector of  binary trait
+- `X` : a n x p matrix of genetic markers selected from QTL analysis (per Chromosome for LOCO)
+- `X₀`: a n x c matrix of covariates.  The intercept is default if no covariates is added.
+- `T` : a matrix of eigen-vectors by eigen decomposition to K (kinship)
+- `S` : a vecor of eigen-values by eigen decomposition to K (kinship)
+
+## Keyword Arguments
+
+- `LOCO`: Boolean. Default is `true` that fine-mapping performs according to the Leave One Chromosome Out (LOCO) scheme.
+- `tol`: tolerance. Default is `1e-4`. 
+
+# Output
+
+ Returns a Type of struct, `Result`, which includes 
+
+-  `ξ` : a n x 1 vector of variational parameters to fit a mixed logitstic function
+-  `β` : a c x 1 vector of fixed effects for covariates
+-  `σ0` : a L x 1 vector of hyper-parameters for prior variances for SuSiE
+-  `τ2` : a constant variance in the variance component of genetic relatedness, `τ²K`, where K is a kinship matrix
+-  `α` : p x L matrix of posterior inclusion probabilities for SuSiE
+-  `ν` : p x L matrix of posterior mean of SuSiE
+-  `ν2` : p x L matrix of posterior second moments of SuSiE
+-  `Σ` : p x L matrix of posterior variances of SuSiE
+
+
+"""
+function fineMapping_GLMM(L::Int64,G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},
+        X₀::Union{Matrix{Float64},Vector{Float64}}=ones(length(y),1),
         T::Union{Array{Float64,3},Matrix{Float64}},S::Union{Matrix{Float64},Vector{Float64}};LOCO::Bool=true,tol=1e-4)
     
     
@@ -108,13 +177,13 @@ function fineMapping_GLMM(G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},X₀
             
     end # loco
  
-    # need to add credile sets
+    # need to add credible sets
     return est
     
 end
 
 
-function fineMapping(G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float64},Vector{Float64}}=ones(length(y),1);
+function fineMapping(L::Int64,G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float64},Vector{Float64}}=ones(length(y),1);
         K::Union{Array{Float64,3},Matrix{Float64}}=Matrix(1.0I,1,1),
         model=["susieglmm","susie","mvsusie"],LOCO::Bool=true,tol=1e-4)
     
@@ -125,7 +194,7 @@ function fineMapping(G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},X₀::Uni
         T, S = eigenK(K;LOCO=LOCO,δ=0.001)
         println("Eigen-decomposition is completed.")
         
-        est = fineMapping_GLMM(G,y,X,X₀,T,S;LOCO=LOCO,tol=tol)
+        est = fineMapping_GLMM(L,G,y,X,X₀,T,S;LOCO=LOCO,tol=tol)
             println("SuSiEGLMM is completed.")  
         
          return est
