@@ -12,7 +12,7 @@ using Statistics, LinearAlgebra, Random, StatsBase, Distributions
 
 
 
-#include("Utilities.jl")
+include("Utilities.jl")
 
 
 
@@ -213,7 +213,8 @@ function emGLMM(L::Int64,yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{F
     
     n, p = size(Xt)
     ghat =zeros(n); Vg = zeros(n); λ = zeros(n)
-    A0 = repeat(Π,outer=(1,L)) ; B0=zeros(p,L); AB2=zeros(p,L)
+    A0 = zeros(p,L);   #repeat(Π,outer=(1,L)) ; 
+    B0=zeros(p,L); AB2=zeros(p,L)
    
     A1 =zeros(p,L); B1=zeros(p,L); Sig1=zeros(p,L)
     ghat2=zeros(axes(S)); τ2_new=zero(eltype(S)); 
