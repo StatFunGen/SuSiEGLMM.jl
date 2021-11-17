@@ -1,11 +1,17 @@
 
 
+
+
+include("VEM.jl")
+
+include("Utilities.jl")
+
 function init(yt::Vector{Float64},Xt₀::Matrix{Float64},S::Vector{Float64};tol=1e-4)
     
-     τ2 = rand(1)*0.5; #arbitray
+     τ2 = rand(1)[1]*0.5; #arbitray
     # may need to change
      β = zeros(axes(Xt₀,2)) 
-     ξ = rand(n)
+     ξ = rand(length(yt))
       
      res= emGLMM(yt,Xt₀,S,τ2,β,ξ;tol=tol)
     
@@ -68,7 +74,7 @@ Returns initial values for parameters `τ2, β, ξ` to run fine-mapping for SuSi
     -  `ξ` : a n x 1 vector of variational parameters to fit a mixed logitstic function
 
 """
-function initialization(y::Vector{Float64},X₀::Union{Matrix{Float64},Vector{Float64}}=ones(length(y),1),T::Matrix{Float64},
+function initialization(y::Vector{Float64},X₀::Union{Matrix{Float64},Vector{Float64}},T::Matrix{Float64},
         S::Vector{Float64};tol=1e-4)
     
     # check if covariates are added as input and include the intercept. 
@@ -89,27 +95,27 @@ end
 function SuSiEGLMM(L::Int64,Π::Vector{Float64},yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{Float64},
         S::Vector{Float64},est0::Null_est;tol=1e-4)
     
-    n, p = size(Xt)
+    # n, p = size(Xt)
     #initialization :
      σ0 = 0.1*ones(L);
      
-        result = emGLMM(L,yt,Xt,Xt₀,S,est0.τ2,est0.β,est0.ξ,σ0,Π;tol::Float64=1e-4)
+        result = emGLMM(L,yt,Xt,Xt₀,S,est0.τ2,est0.β,est0.ξ,σ0,Π;tol=1e-4)
             
     return result
     
 end 
 
 
-function nullSuSiE_GLMM()
+# function nullSuSiE_GLMM()
     
     
     
     
-end
+# end
 
 """
 
-    fineMapping_GLMM(G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float64},Vector{Float64}}=ones(length(y),1),
+    fineMapping_GLMM(L::Int64,G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float64},Vector{Float64}},Π::Vector{Float64},
         T::Union{Array{Float64,3},Matrix{Float64}},S::Union{Matrix{Float64},Vector{Float64}};LOCO::Bool=true,tol=1e-4)
 
 Performs fine-mapping analysis based on SuSiE (Sum of Single Effects model) for a generalized linear mixed model for a binary trait (logistic mixed model).
@@ -122,6 +128,7 @@ Performs fine-mapping analysis based on SuSiE (Sum of Single Effects model) for 
 - `y` : a n x 1 vector of  binary trait
 - `X` : a n x p matrix of genetic markers selected from QTL analysis (per Chromosome for LOCO)
 - `X₀`: a n x c matrix of covariates.  The intercept is default if no covariates is added.
+- `Π` : a p x 1 vector of prior inclusion probabilities for SuSiE
 - `T` : a matrix of eigen-vectors by eigen decomposition to K (kinship)
 - `S` : a vecor of eigen-values by eigen decomposition to K (kinship)
 
@@ -146,7 +153,7 @@ Performs fine-mapping analysis based on SuSiE (Sum of Single Effects model) for 
 
 """
 function fineMapping_GLMM(L::Int64,G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},
-        X₀::Union{Matrix{Float64},Vector{Float64}}=ones(length(y),1),
+        X₀::Union{Matrix{Float64},Vector{Float64}},Π::Vector{Float64},
         T::Union{Array{Float64,3},Matrix{Float64}},S::Union{Matrix{Float64},Vector{Float64}};LOCO::Bool=true,tol=1e-4)
     
     
@@ -177,13 +184,13 @@ function fineMapping_GLMM(L::Int64,G::GenoInfo,y::Vector{Float64},X::Matrix{Floa
             
     end # loco
  
-    # need to add credible sets
+ 
     return est
     
 end
 
 
-function fineMapping(L::Int64,G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float64},Vector{Float64}}=ones(length(y),1);
+function fineMapping(L::Int64,G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float64},Vector{Float64}},Π::Vector{Float64};
         K::Union{Array{Float64,3},Matrix{Float64}}=Matrix(1.0I,1,1),
         model=["susieglmm","susie","mvsusie"],LOCO::Bool=true,tol=1e-4)
     
@@ -194,7 +201,7 @@ function fineMapping(L::Int64,G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},
         T, S = eigenK(K;LOCO=LOCO,δ=0.001)
         println("Eigen-decomposition is completed.")
         
-        est = fineMapping_GLMM(L,G,y,X,X₀,T,S;LOCO=LOCO,tol=tol)
+        est = fineMapping_GLMM(L,G,y,X,X₀,Π,T,S;LOCO=LOCO,tol=tol)
             println("SuSiEGLMM is completed.")  
         
          return est
@@ -207,8 +214,9 @@ function fineMapping(L::Int64,G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},
         
         
         
-    end
+    end #model
         
+end
         
     
         
@@ -223,7 +231,7 @@ function fineMapping(L::Int64,G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},
     
     
     
-end
+
 
 
 
@@ -237,3 +245,6 @@ function fineMapping1(f::Function,args...;kwargs...)
     return res
         
 end
+
+
+export init, initialization, fineMapping_GLMM, SuSiEGLMM
