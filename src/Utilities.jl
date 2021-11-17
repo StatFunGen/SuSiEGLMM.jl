@@ -1,4 +1,4 @@
-
+export eigenK,rotate,logistic,Lambda,Seed
 
 #Spectral decomposition
 """
@@ -25,9 +25,9 @@ Returns a 3d-array (or a matrix) of eigen vectors (orthogonal matrix) and the co
 function eigenK(K::Union{Array{Float64,3},Matrix{Float64}};LOCO::Bool=true,δ::Float64=0.001)
     
    if (LOCO)
-       chr = size(K,3); 
+       nchr = size(K,3);  n = size(K,1);
        S = zeros(n,nchr);
-       T = zeros(n,n,chr);
+       T = zeros(n,n,nchr);
     
         for j =1:nchr ## add parallelization later
            if(!isposdef(K[:,:,j])) # check pdf
@@ -115,12 +115,22 @@ end
 
 
 #compute X'y : 't': 'T' for transpose, 'N' for no transpose
-function getXy(Xt::Matrix{Float64},yt::Vector{Float64},t::Char)
+function getXy(t::Char,Xt::Matrix{Float64},yt::Vector{Float64})
     
     y1= BLAS.gemv(t,Xt,yt)
     
     return y1
+end
 
+
+#matrix multiplication AB: 'tA', 'tB': 'T' for transpose, 'N' for no transpose
+function getXX(tA::Char,A::Matrix{Float64},tB::Char,B::Matrix)
+    
+     X = BLAS.gemm(tA,tB,A,B)
+    
+    return X
+    
+end
 
 
 """
@@ -141,6 +151,8 @@ function Lambda(ξ::Float64)
    
     return 0.25*tanh(ξ)/ξ    
 end
+
+
 
 
 """    
@@ -167,11 +179,12 @@ julia> Seed(20)
 ```
 
 """    
-function Seed(M::Int64,replace=::Bool=false)
+function Seed(M::Int64,replace::Bool=false)
         
         np=nprocs(); pid=procs()
         if (M < np) && (!replace)
             println("Error. The random number generator should be greater than the number of nprocs, $(np).")
+        end
         seeds = sample(1:M, np, replace=replace)
         
         for j =1:np
