@@ -149,7 +149,7 @@ function mStep!(ξ_new::Vector{Float64},β_new::Vector{Float64},
     ŷ₀ = getXy('N',Xt₀,β)
     
     ξ_new[:] = sqrt.(ŷ₀.^2 + ghat2 + 2(ŷ₀.*ghat)) 
-    β_new[:]= BLAS.gemm('T','N',Xt₀,(λ.*Xt₀))\getXy('T',Xt₀,(yt- λ.*ghat))
+    β_new[:]= symXX('T', sqrt.(λ).*Xt₀)\getXy('T',Xt₀,(yt- λ.*ghat))
             
 end
 
@@ -254,6 +254,7 @@ end
 struct Null_est
     ξ::Vector{Float64}
     β::Vector{Float64}
+    μ::Vector{Float64}
     τ2::Float64
     elbo::Float64
 end
@@ -290,7 +291,7 @@ function emGLMM(yt,Xt₀,S,τ2,β,ξ;tol::Float64=1e-4)
           numitr +=1        
     end
     
-    return Null_est(ξ,β,τ2,el0)
+    return Null_est(ξ,β,ghat,τ2,el0)
         
     
     

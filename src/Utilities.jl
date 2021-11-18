@@ -132,6 +132,14 @@ function getXX(tA::Char,A::Matrix{Float64},tB::Char,B::Matrix)
     
 end
 
+# compute symmetric square matrix, t ='T' for X'X, t='N' for XX'
+function symXX(t::Char,X::Array{Float64,2})
+    
+   XtX = Symmetric(BLAS.syrk('U',t,1.0,X))
+    
+    return XtX
+    
+end
 
 """
 
