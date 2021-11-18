@@ -10,9 +10,9 @@ module SuSiEGLMM
 
 
 ### include function files
-include("Utilities.jl")
+# include("Utilities.jl")
 
-include("VEM.jl")
+# include("VEM.jl")
 
 include("GLMM.jl")
 
