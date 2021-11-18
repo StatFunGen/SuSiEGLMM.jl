@@ -1,10 +1,9 @@
 
 
-
-
+include("Utilities.jl")
 include("VEM.jl")
 
-include("Utilities.jl")
+
 
 function init(yt::Vector{Float64},Xt₀::Matrix{Float64},S::Vector{Float64};tol=1e-4)
     
@@ -92,7 +91,7 @@ end
 
 
 # X₀: check if it includes intercept
-function SuSiEGLMM(L::Int64,Π::Vector{Float64},yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{Float64},
+function susieGLMM(L::Int64,Π::Vector{Float64},yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{Float64},
         S::Vector{Float64},est0::Null_est;tol=1e-4)
     
     # n, p = size(Xt)
@@ -164,7 +163,7 @@ function fineMapping_GLMM(L::Int64,G::GenoInfo,y::Vector{Float64},X::Matrix{Floa
                 midx= findall(G.chr.== Chr[j])
                 Xt₀, yt, init0 = initialization(y,X₀,T[:,:,j],S[:,j];tol=tol)
                 Xt= rotateX(X[:,midx],T[:,:,j])
-                res0= SuSiEGLMM(L,Π,yt,Xt,Xt₀,S[:,j],init0;tol=tol)
+                res0= susieGLMM(L,Π,yt,Xt,Xt₀,S[:,j],init0;tol=tol)
                 res0
                            end
            
@@ -178,7 +177,7 @@ function fineMapping_GLMM(L::Int64,G::GenoInfo,y::Vector{Float64},X::Matrix{Floa
               init0= init(yt,Xt₀,S;tol=tol)
               
               est= @distributed (vcat) for j in eachindex(Chr)
-                      est0 = SuSiEGLMM(L,Π,yt,Xt,Xt₀,S,init0;tol=tol)
+                      est0 = susieGLMM(L,Π,yt,Xt,Xt₀,S,init0;tol=tol)
                       est0
                             end
             
