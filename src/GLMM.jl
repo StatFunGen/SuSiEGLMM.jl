@@ -73,7 +73,7 @@ Returns initial values for parameters `τ2, β, ξ` to run fine-mapping for SuSi
     -  `ξ` : a n x 1 vector of variational parameters to fit a mixed logitstic function
 
 """
-function initialization(y::Vector{Float64},X₀::Union{Matrix{Float64},Vector{Float64}},T::Matrix{Float64},
+function initialization(y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float64},Vector{Float64}},T::Matrix{Float64},
         S::Vector{Float64};tol=1e-4)
     
     # check if covariates are added as input and include the intercept. 
@@ -82,11 +82,12 @@ function initialization(y::Vector{Float64},X₀::Union{Matrix{Float64},Vector{Fl
     end
     
         
-                   Xt₀ = rotateX(X₀,T)
-                   yt = rotateY(y,T)
+#                    Xt₀ = rotateX(X₀,T)
+#                    yt = rotateY(y,T)
+                   Xt, Xt₀, yt = rotate(y,X,X₀,T)   
                    init_est= init(yt,Xt₀,S;tol=tol)
        
-    return Xt₀, yt, init_est
+    return Xt, Xt₀, yt, init_est
 end
 
 
@@ -104,7 +105,7 @@ function susieGLMM(L::Int64,Π::Vector{Float64},yt::Vector{Float64},Xt::Matrix{F
     
 end 
 
-
+# compute score test statistic
 function computeT(init0::Null_est,yt::Vector{Float64},Xt₀::Matrix{Float64},Xt::Matrix{Float64})
     
         p=axes(Xt,2)
@@ -167,8 +168,7 @@ function scoreTest(G::GenoInfo,y::Vector{Float64},X₀::Union{Matrix{Float64},Ve
 
          T_stat = @distributed (vcat) for j= eachindex(Chr)
                        midx= findall(G.chr.== Chr[j])
-                       Xt₀, yt, init0 = initialization(y,X₀,T[:,:,j],S[:,j];tol=tol)
-                       Xt= rotateX(X[:,midx],T[:,:,j])
+                       Xt, Xt₀, yt, init0 = initialization(y,X[:,midx],X₀,T[:,:,j],S[:,j];tol=tol) 
                        tstat = computeT(init0,yt,Xt₀,Xt)
                         tstat
                      end
@@ -180,26 +180,25 @@ function scoreTest(G::GenoInfo,y::Vector{Float64},X₀::Union{Matrix{Float64},Ve
          T, S = eigenK(K;LOCO=LOCO,δ=0.001)
          println("Eigen-decomposition is completed.")
 
-            if(X₀!= ones(length(y),1))
-               X₀ = hcat(ones(length(y)),X₀)
-            end
-        
-         Xt, Xt₀, yt = rotate(y,X,X₀,T)    
-         init0= init(yt,Xt₀,S;tol=tol)    
+         Xt, Xt₀, yt, init0 = initialization(y,X,X₀,T,S;tol=tol) 
          T_stat = computeT(init0,yt,Xt₀,Xt)
-     
-
+        
     end
+    
+    p_value = ccdf.(Chisq(1),T_stat) #check
 
-    return T_stat
+    return T_stat, p_value
 end
 
 """
 
-    fineMapping_GLMM(L::Int64,G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float64},Vector{Float64}},Π::Vector{Float64},
-        T::Union{Array{Float64,3},Matrix{Float64}},S::Union{Matrix{Float64},Vector{Float64}};LOCO::Bool=true,tol=1e-4)
+     fineMapping_GLMM(G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},
+        X₀::Union{Matrix{Float64},Vector{Float64}},
+        T::Union{Array{Float64,3},Matrix{Float64}},S::Union{Matrix{Float64},Vector{Float64}};
+        LOCO::Bool=true,L::Int64=10,Π::Vector{Float64}=[1/size(X,2)],tol=1e-4)
 
-Performs fine-mapping analysis based on SuSiE (Sum of Single Effects model) for a generalized linear mixed model for a binary trait (logistic mixed model).
+
+Performs SuSiE (Sum of Single Effects model) GLMM fine-mapping analysis for a binary trait (logistic mixed model).
 
 
 
@@ -208,7 +207,7 @@ Performs fine-mapping analysis based on SuSiE (Sum of Single Effects model) for 
 - `G` : a Type of struct, `GenoInfo`. See [`GenoInfo`](@ref).
 - `y` : a n x 1 vector of  binary trait
 - `X` : a n x p matrix of genetic markers selected from QTL analysis (per Chromosome for LOCO)
-- `X₀`: a n x c matrix of covariates.  The intercept is default if no covariates is added.
+- `X₀`: a n x 1 vector or n x c matrix of covariates.  The intercept is default if no covariates is added.
 - `T` : a matrix of eigen-vectors by eigen decomposition to K (kinship)
 - `S` : a vecor of eigen-values by eigen decomposition to K (kinship)
 
@@ -245,9 +244,9 @@ function fineMapping_GLMM(G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},
              Chr=sort(unique(G.chr));
    est= @distributed (vcat) for j= eachindex(Chr)
                 midx= findall(G.chr.== Chr[j])
-                Xt₀, yt, init0 = initialization(y,X₀,T[:,:,j],S[:,j];tol=tol)
-                Xt= rotateX(X[:,midx],T[:,:,j])
-                           if (length(Π)==1)
+                Xt, Xt₀, yt, init0 = initialization(y,X[:,midx],X₀,T[:,:,j],S[:,j];tol=tol)
+                           #check size of Π
+                          if (length(Π)==1) 
                               Π1 =repeat(Π,length(midx))
                              elseif (length(Π)!= size(X,2))
                                 println("Error. The length of Π should match $(size(X,2)) SNPs!")
@@ -261,17 +260,15 @@ function fineMapping_GLMM(G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},
            
     else #no loco for one genomic region
             
-            if(X₀!= ones(length(y),1))
-               X₀ = hcat(ones(length(y)),X₀)
-            end
+            
                   if(length(Π)==1)
                      Π =repeat(Π,size(X,2))
                   end
-                 Xt, Xt₀, yt = rotate(y,X,X₀,T)    
-                 init0= init(yt,Xt₀,S;tol=tol)        
+                 
+                 Xt, Xt₀, yt, init0 = initialization(y,X,X₀,T,S;tol=tol) 
                  est = susieGLMM(L,Π,yt,Xt,Xt₀,S,init0;tol=tol)
                      
-                            end
+                           
             
     end # loco
  
@@ -282,7 +279,7 @@ end
 
 
 function fineMapping(G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float64},Vector{Float64}};
-        K::Union{Array{Float64,3},Matrix{Float64}}=Matrix(1.0I,1,1),L::Int64=10,Π::Vector{Float64},LOCO::Bool=true,
+        K::Union{Array{Float64,3},Matrix{Float64}}=Matrix(1.0I,1,1),L::Int64=10,Π::Vector{Float64}=[1/size(X,2)],LOCO::Bool=true,
         model=["susieglmm","susie","mvsusie"],tol=1e-4)
     
     #need to work more   
