@@ -132,11 +132,18 @@ function mStep!(ξ_new::Vector{Float64},β_new::Vector{Float64},A1::Matrix{Float
     
     # ξ_new= zeros(axes(yt))
     # β_new= zeros(axes(Xt₀,2))
-    ŷ₀ = getXy('N',Xt₀,β)
+      ŷ₀ = getXy('N',Xt₀,β)
+      AB= getXy('N',Xt,sum(A1.*B1,dims=2)[:,1])
+   
+      for j in eachindex(yt)
+        
+         ξ_new[j]  = sum(Xt[j,:].^2.0.*(sum(AB2,dims=2))[:,1]) # E(Xb)^2
+      end
     
-  
-    ξ_new[:] = sqrt.(ŷ₀.^2 + getXy('N',Xt,sum(AB2,dims=2)[:,1]) + ghat2 + 2(ŷ₀ +ghat).*getXy('N',Xt,sum(A1.*B1,dims=2)[:,1])+ 2(ŷ₀.*ghat)) 
-    β_new[:]= BLAS.gemm('T','N',Xt₀,(λ.*Xt₀))\getXy('T',Xt₀,(yt- λ.*(getXy('N',Xt,sum(A1.*B1,dims=2)[:,1]) + ghat)))
+    ξ_new[:] = sqrt.(ξ_new + ŷ₀.^2 + ghat2 + 2(ŷ₀ +ghat).*AB+ 2(ŷ₀.*ghat))
+        
+    # β_new[:]= symXX('T',sqrt.(λ).*Xt₀)\getXy('T',Xt₀,(yt- λ.*(AB + ghat)))
+     β_new[:]= getXX('T',Xt₀,'N',(λ.*Xt₀))\getXy('T',Xt₀,(yt- λ.*(AB + ghat)))
         
 end
 
@@ -147,9 +154,9 @@ function mStep!(ξ_new::Vector{Float64},β_new::Vector{Float64},
         yt::Vector{Float64},Xt₀::Matrix{Float64},β::Vector{Float64})
   
     ŷ₀ = getXy('N',Xt₀,β)
-    
-    ξ_new[:] = sqrt.(ŷ₀.^2 + ghat2 + 2(ŷ₀.*ghat)) 
-    β_new[:]= symXX('T', sqrt.(λ).*Xt₀)\getXy('T',Xt₀,(yt- λ.*ghat))
+   
+    ξ_new[:] = sqrt.(ŷ₀.^2 + ghat2 + 2(ŷ₀.*ghat))  # check for debugging!
+    β_new[:]=  getXX('T',Xt₀,'N',(λ.*Xt₀))\getXy('T',Xt₀,(yt- λ.*ghat))
             
 end
 
@@ -161,13 +168,8 @@ function ELBO(L::Int64,ξ_new::Vector{Float64},β_new::Vector{Float64},σ0_new::
         ghat2::Vector{Float64},Vg::Vector{Float64},S::Vector{Float64},yt::Vector{Float64},Xt₀::Matrix{Float64})
 
     n=length(yt); p = size(B1,1); lnb =zero(1);
-# log.(logistic.(ξ))- 0.5*ξ+ yX*β
-        # 2nd moment computation
-# sum(ghat2/.S)/τ2_new
-#0.5*sum(AB2,dims=1)./σ0)  
-
-     ll= sum(log.(logistic.(ξ_new))- 0.5*ξ_new)+ yt'*getXy('N',Xt₀,β_new)#lik
-     gl = -0.5*(n*log(τ2_new)+ sum(log.(S./Vg))- 1.0) - sum(ghat2./S)/τ2_new # g
+    
+     elbo0= ELBO(ξ_new,β_new,τ2_new,ghat2,Vg,S,yt,Xt₀) #null part
      # susie part
     for l= 1: L 
      lnb  += A1[:,l]'*(log.(A1[:,l]./Π) - 0.5*log.(Sig1[:,l])) 
@@ -175,7 +177,7 @@ function ELBO(L::Int64,ξ_new::Vector{Float64},β_new::Vector{Float64},σ0_new::
                
       bl= lnb  +0.5*(sum(log.(σ0_new).- L)+ 0.5*sum(sum(AB2,dims=1)'./σ0_new))
          
-    return ll+gl-bl
+    return elbo0-bl
             
 end
     
@@ -201,7 +203,7 @@ struct Result
     elbo::Float64
     α::Matrix{Float64}
     ν::Matrix{Float64}
-    ν2::Matrix{Float64}
+    # ν2::Matrix{Float64}
     Σ::Matrix{Float64}    
 end
     
@@ -234,9 +236,9 @@ function emGLMM(L::Int64,yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{F
         
          el1=ELBO(L,ξ_new,β_new,σ0_new,τ2_new,A1,B1,AB2,Sig1,Π,ghat2,Vg,S,yt,Xt₀)
      
-         crit=el1-el0 
+         # crit=el1-el0 
          #check later for performance
-         ##crit=norm(ξ_new-ξ)+norm(β_new-β)+abs(τ2_new-τ2)+abs(el1-el0) 
+         crit=norm(ξ_new-ξ)+norm(β_new-β)+abs(τ2_new-τ2)+abs(el1-el0) 
          
          ξ=ξ_new;β=β_new;σ0=σ0_new; τ2=τ2_new;el0=el1
         
@@ -245,7 +247,7 @@ function emGLMM(L::Int64,yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{F
         
     end
     
-    return Result(ξ,β,σ0,τ2,el0,A1, B1, AB2, Sig1)
+    return Result(ξ,β,σ0,τ2,el0,A1, B1, Sig1)
         
 end
 
@@ -283,8 +285,8 @@ function emGLMM(yt,Xt₀,S,τ2,β,ξ;tol::Float64=1e-4)
         
          el1=ELBO(ξ_new,β_new,τ2_new,ghat2,Vg,S,yt,Xt₀)
      
-         crit=el1-el0 
-         #crit=norm(ξ_new-ξ)+norm(β_new-β)+abs(τ2_new-τ2)  
+         # crit=el1-el0 
+         crit=norm(ξ_new-ξ)+norm(β_new-β)+abs(τ2_new-τ2)+abs(el1-el0)  
         
          ξ=ξ_new;β=β_new; τ2=τ2_new;el0=el1
         

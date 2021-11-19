@@ -10,7 +10,7 @@ function init(yt::Vector{Float64},Xt₀::Matrix{Float64},S::Vector{Float64};tol=
      τ2 = rand(1)[1]*0.5; #arbitray
     # may need to change
      β = zeros(axes(Xt₀,2)) 
-     ξ = rand(length(yt))
+     ξ = rand(length(yt))*0.1
       
      res= emGLMM(yt,Xt₀,S,τ2,β,ξ;tol=tol)
     
@@ -190,6 +190,10 @@ function scoreTest(G::GenoInfo,y::Vector{Float64},X₀::Union{Matrix{Float64},Ve
     return T_stat, p_value
 end
 
+
+
+
+
 """
 
      fineMapping_GLMM(G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},
@@ -228,7 +232,6 @@ Performs SuSiE (Sum of Single Effects model) GLMM fine-mapping analysis for a bi
 -  `τ2` : a constant variance in the variance component of genetic relatedness, `τ²K`, where K is a kinship matrix
 -  `α` : p x L matrix of posterior inclusion probabilities for SuSiE
 -  `ν` : p x L matrix of posterior mean of SuSiE
--  `ν2` : p x L matrix of posterior second moments of SuSiE
 -  `Σ` : p x L matrix of posterior variances of SuSiE
 
 
@@ -335,4 +338,4 @@ function fineMapping1(f::Function,args...;kwargs...)
 end
 
 
-export init, initialization, fineMapping_GLMM, SuSiEGLMM
+export initialization, fineMapping_GLMM, SuSiEGLMM, scoreTest, GenoInfo

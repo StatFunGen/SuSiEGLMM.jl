@@ -157,7 +157,7 @@ end
 # λ(ξ)
 function Lambda(ξ::Float64)
    
-    return 0.25*tanh(ξ)/ξ    
+    return 0.25*tanh(ξ/2)/ξ    
 end
 
 
