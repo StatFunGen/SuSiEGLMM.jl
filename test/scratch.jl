@@ -5,7 +5,7 @@ using Statistics, Distributions, StatsBase, Random, LinearAlgebra, DelimitedFile
 #include("./SuSiEGLMM.jl")
 #using .SuSiEGLMM
 
-include("GIT/SuSiEGLMM.jl/src/GLMM.jl")
+# include("GIT/SuSiEGLMM.jl/src/GLMM.jl")
 
 info=readdlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/snp_info.bim")
 data=readdlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/pop_518ids_4000snps.txt";header=true); #518 x 4000 snps (qtl = 1927th)
@@ -22,7 +22,8 @@ y=convert(Vector{Float64},data[1][:,end])
 # kinship
 K=readdlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/pop_518fams_4000snps.cXX.txt") #518
 
-info1= [info[1:20,:];info[1925:1929,:]]
+K0=zeros(n,n,2);K2=copy(K);K0[:,:,1]=K2; K0[:,:,2]=K
+T1,S1 = eigenK(K0)
 
 G= GenoInfo(info1[:,2],info1[:,1],info1[:,3])
 
@@ -47,7 +48,7 @@ X = convert(Matrix{Float64},X)
 n,p = size(X)
 L=3; Π = ones(p)/p
 
-@time est1= fineMapping_GLMM(L,G,y,X,Covar,Π,T,S;LOCO=false,tol=1e-4)
+@time est1= fineMapping_GLMM(G,y,X,Covar,T1[:,:,1],S1[:,1];LOCO=false,tol=1e-4)
     
 @time Xt0, yt, est0 =initialization(y,Covar,T,S)
 
@@ -57,7 +58,7 @@ L=3; Π = ones(p)/p
 
 
 #check loco
-@everywhere include("GIT/SuSiEGLMM.jl/src/GLMM.jl")
+# @everywhere include("GIT/SuSiEGLMM.jl/src/GLMM.jl")
 X1 = data[1][:,6:end-1]
  X1[X1.=="NA"].= missing
 for j =axes(X1,2)
@@ -68,14 +69,23 @@ end
 X1 = convert(Array{Float64,2},X1)
 
 n,p=size(X1)
-K0=zeros(n,n,2);K2=copy(K);K0[:,:,1]=K2; K0[:,:,2]=K
 G1=GenoInfo(info[:,2],info[:,1],info[:,3])
+info1= [info[1:20,:];info[1925:1929,:]]
 
 
 
-L=5;Π = rand(p)
+# L=5;Π = rand(p)
 
-T1,S1 = eigenK(K0)
+
 
 # need to fix loco- postB! part.
-@time est2= fineMapping_GLMM(L,G1,y,X1,Covar,Π,T1,S1)
+addprocs(2)
+@everywhere using Pkg
+@everywhere Pkg.activate("/Users/hyeonjukim/GIT/SuSiEGLMM.jl/")
+
+@time est2= SuSiEGLMM.fineMapping_GLMM(G1,y,X1,Covar,T1,S1;LOCO=true, tol=1e-5)
+
+@time tstat, pvalue= scoreTest(G1,y,Covar,X1,K0;LOCO=true)
+
+#pip 
+[1.0-prod(1.0.-est2[2].α[j,:]) for j=axes(est2[2].α,1)]
