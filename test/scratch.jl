@@ -25,6 +25,7 @@ K=readdlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/pop_518fams_4000snps.cXX.txt") #
 K0=zeros(n,n,2);K2=copy(K);K0[:,:,1]=K2; K0[:,:,2]=K
 T1,S1 = eigenK(K0)
 
+info1= [info[1:20,:];info[1925:1929,:]]
 G= GenoInfo(info1[:,2],info1[:,1],info1[:,3])
 
 
@@ -48,6 +49,12 @@ X = convert(Matrix{Float64},X)
 n,p = size(X)
 L=3; Π = ones(p)/p
 
+# write small data for debugging in VS-code
+# writedlm("./test/smalldataX_covar_y.txt",[X[1:15,11:25] Covar[1:15] y[1:15]])
+# writedlm("./test/testinfo.txt",info[11:25,:])
+# writedlm("./test/testinfo_loco.txt",[info[11:17,:];info[end-7:end,:]])
+# writedlm("./test/testK.txt",K[1:15,1:15])
+
 @time est1= fineMapping_GLMM(G,y,X,Covar,T1[:,:,1],S1[:,1];LOCO=false,tol=1e-4)
     
 @time Xt0, yt, est0 =initialization(y,Covar,T,S)
@@ -70,7 +77,7 @@ X1 = convert(Array{Float64,2},X1)
 
 n,p=size(X1)
 G1=GenoInfo(info[:,2],info[:,1],info[:,3])
-info1= [info[1:20,:];info[1925:1929,:]]
+
 
 
 
@@ -82,6 +89,7 @@ info1= [info[1:20,:];info[1925:1929,:]]
 addprocs(2)
 @everywhere using Pkg
 @everywhere Pkg.activate("/Users/hyeonjukim/GIT/SuSiEGLMM.jl/")
+@everywhere using SuSiEGLMM
 
 @time est2= SuSiEGLMM.fineMapping_GLMM(G1,y,X1,Covar,T1,S1;LOCO=true, tol=1e-5)
 
