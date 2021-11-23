@@ -161,7 +161,8 @@ function scoreTest(G::GenoInfo,y::Vector{Float64},X₀::Union{Matrix{Float64},Ve
 
         Chr=sort(unique(G.chr));
 
-        T, S = eigenK(K;LOCO=LOCO,δ=0.001)
+        # T, S = eigenK(K;LOCO=LOCO,δ=0.001)
+        T, S = svdK(K;LOCO=LOCO)
         println("Eigen-decomposition is completed.")
 
         # T_stat=zeros(size(X,2))
@@ -177,7 +178,8 @@ function scoreTest(G::GenoInfo,y::Vector{Float64},X₀::Union{Matrix{Float64},Ve
     else #no loco
 
          
-         T, S = eigenK(K;LOCO=LOCO,δ=0.001)
+        #  T, S = eigenK(K;LOCO=LOCO,δ=0.001)
+         T, S = svdK(K;LOCO=LOCO)
          println("Eigen-decomposition is completed.")
 
          Xt, Xt₀, yt, init0 = initialization(y,X,X₀,T,S;tol=tol) 
@@ -289,7 +291,8 @@ function fineMapping(G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},X₀::Uni
     
     if(model=="susieglmm")
         
-        T, S = eigenK(K;LOCO=LOCO,δ=0.001)
+        T, S = eigenK(K;LOCO=LOCO,δ=0.01)
+        # T, S = svdK(K;LOCO=LOCO,δ=0.001)
         println("Eigen-decomposition is completed.")
         
         est = fineMapping_GLMM(G,y,X,X₀,T,S;L=L,Π=Π,LOCO=LOCO,tol=tol)

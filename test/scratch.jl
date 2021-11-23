@@ -22,8 +22,7 @@ y=convert(Vector{Float64},data[1][:,end])
 # kinship
 K=readdlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/pop_518fams_4000snps.cXX.txt") #518
 
-K0=zeros(n,n,2);K2=copy(K);K0[:,:,1]=K2; K0[:,:,2]=K
-T1,S1 = eigenK(K0)
+
 
 info1= [info[1:20,:];info[1925:1929,:]]
 G= GenoInfo(info1[:,2],info1[:,1],info1[:,3])
@@ -55,9 +54,20 @@ L=3; Π = ones(p)/p
 # writedlm("./test/testinfo_loco.txt",[info[11:17,:];info[end-7:end,:]])
 # writedlm("./test/testK.txt",K[1:15,1:15])
 
+K0=zeros(n,n,2);K2=copy(K);K0[:,:,1]=K2; K0[:,:,2]=K
+T1,S1 = eigenK(K0)
+T1,S1 = svdK(K0)
+
+
 @time est1= fineMapping_GLMM(G,y,X,Covar,T1[:,:,1],S1[:,1];LOCO=false,tol=1e-4)
-    
-@time Xt0, yt, est0 =initialization(y,Covar,T,S)
+
+#try with cholesky (provide stable eigenvalues)
+ch=cholesky(K)
+F=svd(ch.U)
+T2 = convert(Array{Float64,2}, F.Vt')
+@time est0= fineMapping_GLMM(G,y,X,Covar,T2,F.S.^2;LOCO=false,tol=1e-4)    
+#need to try different datasets.  
+
 
 #pip 
  [1.0.-prod(1.0.-est1.α[j,:]) for j=1:p]
