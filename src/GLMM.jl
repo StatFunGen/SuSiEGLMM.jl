@@ -105,11 +105,11 @@ function susieGLMM(L::Int64,Π::Vector{Float64},yt::Vector{Float64},Xt::Matrix{F
     
 end 
 
-# compute score test statistic
+# compute score test statistic : need to check again
 function computeT(init0::Null_est,yt::Vector{Float64},Xt₀::Matrix{Float64},Xt::Matrix{Float64})
     
         p=axes(Xt,2)
-        r₀ =  yt.*(getXy('N',Xt₀,init0.β)+init0.μ)  
+        r₀ =  2*yt.*(getXy('N',Xt₀,init0.β)+init0.μ)  
         p̂ = logistic.(r₀)
         Γ  = p̂.*(1.0.-p̂)
         proj = ones(length(yt)) -  Xt₀*(symXX('T',sqrt.(Γ).*Xt₀)\getXy('T',Xt₀,Γ))
