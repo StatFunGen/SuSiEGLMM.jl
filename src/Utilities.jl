@@ -51,6 +51,7 @@ function eigenK(K::Union{Array{Float64,3},Matrix{Float64}};LOCO::Bool=true,δ::F
         
 end
 
+
 function svdK(K::Union{Array{Float64,3},Matrix{Float64}};LOCO::Bool=true,δ::Float64=0.001)
     
     if (LOCO)
@@ -58,13 +59,14 @@ function svdK(K::Union{Array{Float64,3},Matrix{Float64}};LOCO::Bool=true,δ::Flo
         S = zeros(n,nchr);
         T = zeros(n,n,nchr);
      
-         for j =1:nchr ## add parallelization later
+         for j =1:nchr 
+            # may consider to svd from the genotype data
             if(!isposdef(K[:,:,j])) # check pdf
                  K[:,:,j]=K[:,:,j]+ (abs(minimum(svdvals(K[:,:,j])))+δ)*I
             end
                  
         #spectral decomposition
-          F=svd(K[:,:,j])
+          F=svd(K[:,:,j];full=true)
           T[:,:,j], S[:,j] = F.U, F.S
          end
         
@@ -73,7 +75,7 @@ function svdK(K::Union{Array{Float64,3},Matrix{Float64}};LOCO::Bool=true,δ::Flo
            if(!isposdef(K)) # check pdf
                  K=K+ (abs(minimum(svdvals(K)))+δ)*I
             end
-         F=svd(K)
+         F=svd(K;full=true)
          return F.U, F.S
          
      end
