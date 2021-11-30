@@ -7,7 +7,7 @@ include("VEM.jl")
 
 function init(yt::Vector{Float64},Xt₀::Matrix{Float64},S::Vector{Float64};tol=1e-4)
     
-     τ2 = rand(1)[1]*0.5; #arbitray
+     τ2 = rand(1)[1]*0.1; #arbitray
     # may need to change
      β = zeros(axes(Xt₀,2)) 
      ξ = rand(length(yt))*0.1
@@ -341,4 +341,4 @@ function fineMapping1(f::Function,args...;kwargs...)
 end
 
 
-export initialization, fineMapping_GLMM, SuSiEGLMM, scoreTest, GenoInfo
+export init, initialization, fineMapping_GLMM, susieGLMM, computeT, scoreTest, GenoInfo
