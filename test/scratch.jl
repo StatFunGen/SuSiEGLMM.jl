@@ -21,7 +21,7 @@ y=convert(Vector{Float64},data[1][:,end])
 
 # kinship
 K=readdlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/pop_518fams_4000snps.cXX.txt") #518
-
+K_fam=readdlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/fam_100fams_4000snps.cXX.txt")
 
 
 info1= [info[1:20,:];info[1925:1929,:]]
@@ -65,11 +65,11 @@ L=3; Π = ones(p)/p
 
 # @time est1= fineMapping_GLMM(G,y,X,Covar,T1[:,:,1],S1[:,1];LOCO=false,tol=1e-4)
 
-#try with cholesky (provide stable eigenvalues)
-# ch=cholesky(K)
-# F=svd(ch.U)
-# T2 = convert(Array{Float64,2}, F.Vt')
-# @time est0= fineMapping_GLMM(G,y,X,Covar,T2,F.S.^2;LOCO=false,tol=1e-4)    
+# try with cholesky (provide stable eigenvalues)
+ch=cholesky(K)
+F=svd(ch.U)
+T2 = convert(Array{Float64,2}, F.Vt')
+@time est0= fineMapping_GLMM(G,y,X,Covar,T2,F.S.^2;LOCO=false,tol=1e-4)    
 
 
 F=svd(K;full=true)
@@ -86,8 +86,27 @@ F=svd(K;full=true)
 fineMapping_GLMM(G,y,X,Covar,F.U,F.S;LOCO=false,tol=1e-4)    
 @time est2= fineMapping_GLMM(G1,y,X1,Covar,F.U,F.S;LOCO=false, tol=1e-5)
 
+
+for j=axes(K,1)
+    K[j,j]=1.0
+end
+
+T,S = svdK(K;LOCO=false)
+if(Covar!= ones(length(y),1))
+    Covar = hcat(ones(length(y)),Covar)
+end
+
+
+
+Xt, Ct, yt = rotate(y,X,Covar,T) 
+@time res0=susieGLMM(L,Π,yt,Xt,Ct,S;tol=1e-4)
+@time res=susieGLMM(L,Π,yt,Xt,Ct,S;tol=1e-5)
+@time res2=susieGLMM(L,Π,yt,Xt,Ct,S;tol=1e-6)
+
+
+
 #line by line debugging
-Xt, Ct, yt, init_est= initialization(y,X,Covar,F.U,F.S;tol=1e-4, LOCO=false)
+Xt, Ct, yt, init_est= initialization(y,X,Covar,T,S;tol=1e-4)
     
     # check if covariates are added as input and include the intercept. 
     if(Covar!= ones(length(y),1))
@@ -95,7 +114,8 @@ Xt, Ct, yt, init_est= initialization(y,X,Covar,F.U,F.S;tol=1e-4, LOCO=false)
     end
     println(Covar)
         
-#                    Xt₀ = rotateX(X₀,T)
+#   
+                 Xt₀ = rotateX(X₀,T)
 #                    yt = rotateY(y,T)
                    Xt, Ct, yt = rotate(y,X,X₀,F.U)   
                    init_est= SuSiEGLMM.init(yt,Ct,F.S;tol=tol)
@@ -162,7 +182,7 @@ n,p=size(X1)
 G1=GenoInfo(info[:,2],info[:,1],info[:,3])
 
 
-
+Xt, Ct, yt, init0= initialization(y,X1,Covar,T,S;tol=1e-4)
 
 # L=5;Π = rand(p)
 

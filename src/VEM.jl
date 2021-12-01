@@ -107,7 +107,7 @@ yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{Float64},β::Vector{Float6
     
 end
 
-function emB(A1::Matrix{Float64}, B1::Matrix{Float64}, Sig1::Matrix{Float64},σ0::Vector{Float64},L::Int64)
+function emB(A1::Matrix{Float64}, B1::Matrix{Float64}, Sig1::Matrix{Float64},L::Int64)
        
     σ0_new = zeros(L); AB2=zeros(axes(B1));
        # compute the second moment of b_l & update the hyper-parameter σ0
@@ -154,8 +154,10 @@ function mStep!(ξ_new::Vector{Float64},β_new::Vector{Float64},
         yt::Vector{Float64},Xt₀::Matrix{Float64},β::Vector{Float64})
   
     ŷ₀ = getXy('N',Xt₀,β)
+
    
     ξ_new[:] = sqrt.(ŷ₀.^2 + ghat2 + 2(ŷ₀.*ghat))  # check for debugging!
+    # λ= 2Lambda.(ξ_new) #for check
     β_new[:]=  getXX('T',Xt₀,'N',(λ.*Xt₀))\getXy('T',Xt₀,(yt- λ.*ghat))
             
 end
@@ -230,7 +232,7 @@ function emGLMM(L::Int64,yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{F
          postG!(ghat,Vg,λ,yt,Xt,Xt₀,S,β,ξ,τ2,A0,B0)
          ghat2, τ2_new = emG(Vg,ghat,S)
          postB!(A1, B1, Sig1, λ,ghat,yt,Xt,Xt₀,β,σ0,A0,B0,Π,L)
-         σ0_new, AB2 = emB(A1, B1, Sig1,σ0,L)
+         σ0_new, AB2 = emB(A1, B1, Sig1,L)
          
          mStep!(ξ_new,β_new,A1,B1,AB2,ghat,ghat2,λ,yt,Xt,Xt₀,β)
         

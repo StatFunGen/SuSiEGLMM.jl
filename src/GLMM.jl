@@ -7,10 +7,10 @@ include("VEM.jl")
 
 function init(yt::Vector{Float64},Xt₀::Matrix{Float64},S::Vector{Float64};tol=1e-4)
     
-     τ2 = rand(1)[1]*0.1; #arbitray
+     τ2 = rand(1)[1]*0.001; #arbitray
     # may need to change
-     β = zeros(axes(Xt₀,2)) 
-     ξ = rand(length(yt))*0.1
+     β = rand(size(Xt₀,2))*0.0001
+     ξ = rand(length(yt))*0.001
       
      res= emGLMM(yt,Xt₀,S,τ2,β,ξ;tol=tol)
     
@@ -44,7 +44,7 @@ end
 
 """
 
-    initialization(y::Vector{Float64},X₀::Union{Matrix{Float64},Vector{Float64}}=ones(length(y),1),T::Matrix{Float64},
+    initialization(y::Vector{Float64},X₀::Union{Matrix{Float64},Vector{Float64}},T::Matrix{Float64},
         S::Vector{Float64};tol=1e-4)
 
 Returns initial values for parameters `τ2, β, ξ` to run fine-mapping for SuSiEGLMM.
@@ -77,7 +77,7 @@ function initialization(y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix
         S::Vector{Float64};tol=1e-4)
     
     # check if covariates are added as input and include the intercept. 
-    if(X₀!= ones(length(y),1))
+    if(X₀!= ones(length(y),1)) #&&(size(X₀,2)>1)
         X₀ = hcat(ones(length(y)),X₀)
     end
     
@@ -98,11 +98,32 @@ function susieGLMM(L::Int64,Π::Vector{Float64},yt::Vector{Float64},Xt::Matrix{F
     # n, p = size(Xt)
     #initialization :
      σ0 = 0.1*ones(L);
-     
-        result = emGLMM(L,yt,Xt,Xt₀,S,est0.τ2,est0.β,est0.ξ,σ0,Π;tol=1e-4)
+    #  τ2 = rand(1)[1]*0.001; #arbitray
+    # # may need to change
+    #  β = rand(axes(Xt₀,2))*0.0001
+    #  ξ = rand(length(yt))*0.001
+
+        result = emGLMM(L,yt,Xt,Xt₀,S,est0.τ2,est0.β,est0.ξ,σ0,Π;tol=tol)
             
     return result
     
+end 
+
+#try with random small initial values to test H1 model
+function susieGLMM(L::Int64,Π::Vector{Float64},yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{Float64},
+    S::Vector{Float64};tol=1e-4)
+
+# n, p = size(Xt)
+#initialization :
+ σ0 = 0.1*ones(L);
+ τ2 = rand(1)[1]*0.001; #arbitray
+ β = rand(size(Xt₀,2))*0.0001
+ ξ = rand(length(yt))*0.001
+
+    result = emGLMM(L,yt,Xt,Xt₀,S,τ2,β,ξ,σ0,Π;tol=tol)
+        
+return result
+
 end 
 
 # compute score test statistic : need to check again
@@ -251,7 +272,7 @@ function fineMapping_GLMM(G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},
                 midx= findall(G.chr.== Chr[j])
                 Xt, Xt₀, yt, init0 = initialization(y,X[:,midx],X₀,T[:,:,j],S[:,j];tol=tol)
                            #check size of Π
-                          if (length(Π)==1) 
+                          if (Π==[1/size(X,2)]) #default value
                               Π1 =repeat(Π,length(midx))
                              elseif (length(Π)!= size(X,2))
                                 println("Error. The length of Π should match $(size(X,2)) SNPs!")
@@ -283,7 +304,18 @@ function fineMapping_GLMM(G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},
 end
 
 
-function fineMapping(G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float64},Vector{Float64}};
+
+function miniBatch(G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},
+    X₀::Union{Matrix{Float64},Vector{Float64}},
+    T::Union{Array{Float64,3},Matrix{Float64}},S::Union{Matrix{Float64},Vector{Float64}},bsize::Int64=256;
+    LOCO::Bool=true,L::Int64=10,Π::Vector{Float64}=[1/size(X,2)],tol=1e-4)
+
+      
+
+
+end
+
+function fineMapping(G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float64},Vector{Float64}}=ones(length(y),1);
         K::Union{Array{Float64,3},Matrix{Float64}}=Matrix(1.0I,1,1),L::Int64=10,Π::Vector{Float64}=[1/size(X,2)],LOCO::Bool=true,
         model=["susieglmm","susie","mvsusie"],tol=1e-4)
     
@@ -291,8 +323,8 @@ function fineMapping(G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},X₀::Uni
     
     if(model=="susieglmm")
         
-        T, S = eigenK(K;LOCO=LOCO,δ=0.01)
-        # T, S = svdK(K;LOCO=LOCO,δ=0.001)
+        T, S = svdK(K;LOCO=LOCO)
+       
         println("Eigen-decomposition is completed.")
         
         est = fineMapping_GLMM(G,y,X,X₀,T,S;L=L,Π=Π,LOCO=LOCO,tol=tol)
