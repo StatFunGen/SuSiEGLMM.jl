@@ -65,9 +65,10 @@ function svdK(K::Union{Array{Float64,3},Matrix{Float64}};LOCO::Bool=true,δ::Flo
                  K[:,:,j]=K[:,:,j]+ (abs(minimum(svdvals(K[:,:,j])))+δ)*I
             end
                  
-        #spectral decomposition
-          F=svd(K[:,:,j];full=true)
-          T[:,:,j], S[:,j] = F.U, F.S
+        #cholesky & svd for numerical stability
+          C=cholesky(K[:,:,j])
+          F=svd(C.U)
+          T[:,:,j], S[:,j] = F.Vt, F.S.^2
          end
         
          return  T, S
@@ -75,8 +76,9 @@ function svdK(K::Union{Array{Float64,3},Matrix{Float64}};LOCO::Bool=true,δ::Flo
            if(!isposdef(K)) # check pdf
                  K=K+ (abs(minimum(svdvals(K)))+δ)*I
             end
-         F=svd(K;full=true)
-         return F.U, F.S
+         C=cholesky(K)   
+         F=svd(C.U)
+         return F.Vt, F.S.^2
          
      end
 
@@ -122,7 +124,7 @@ function rotateX(X::Matrix{Float64},T::Matrix{Float64})
     
     #U'X, U'X₀,U'(y-1/2)
     
-    Xt=BLAS.gemm('T','N',T,X)
+    Xt=BLAS.gemm('N','N',T,X)
        
     return Xt
     
@@ -134,7 +136,7 @@ function rotateY(y::Vector{Float64},T::Matrix{Float64})
     n=length(y)
     
     #U'X, U'X₀, U'(y-1/2)
-    yt= BLAS.gemv('T',T,(y-0.5*ones(n)))
+    yt= BLAS.gemv('N',T,(y-0.5*ones(n)))
        
     return yt
     

@@ -21,13 +21,13 @@ C=data[:,end-1]
 # @everywhere using SuSiEGLMM
 using Revise
  using Pkg; 
-Pkg.activate("/Users/hyeonjukim/GIT/SuSiEGLMM.jl/")
+Pkg.activate(homedir()*"/GIT/SuSiEGLMM.jl/")
 
  using SuSiEGLMM
 G= GenoInfo(info[:,2],info[:,1],info[:,3])
 G1=GenoInfo(info1[:,2],info1[:,1],info1[:,3]) # for loco
 
-n= size(K,1)
+n, p= size(X)
 K0=zeros(n,n,2);K2=copy(K);K0[:,:,1]=K2; K0[:,:,2]=K
 
 
@@ -35,9 +35,21 @@ T,S = svdK(K0)
 
 
 
-# L=3; Π = ones(p)/p
+L=3; Π = ones(p)/p
 println("step1")
-fineMapping_GLMM(G,y,X,C,T[:,:,1],S[:,1];L=3,LOCO=false,tol=1e-4)
+@time est0=fineMapping_GLMM(G,y,X,C,T[:,:,1],S[:,1];L=3,LOCO=false,tol=1e-4)
+@time est1=fineMapping_GLMM(G,y,X,C,T[:,:,1],S[:,1];L=3,LOCO=false,tol=1e-5)
+@time est2=fineMapping_GLMM(G,y,X,C,T[:,:,1],S[:,1];L=3,LOCO=false,tol=1e-6)
+
+
+if(C!= ones(length(y),1))
+    C = hcat(ones(length(y)),C)
+end
+Xt, Ct, yt = rotate(y,X,C,T[:,:,1]) 
+@time res0=susieGLMM(L,Π,yt,Xt,Ct,S[:,1];tol=1e-4)
+@time res=susieGLMM(L,Π,yt,Xt,Ct,S[:,1];tol=1e-5)
+@time res2=susieGLMM(L,Π,yt,Xt,Ct,S[:,1];tol=1e-6)
+# show similar results using small random initial values vs null function
 
 println("step2")
 tstat,pval=scoreTest(G,y,C,X,K;LOCO=false)
