@@ -8,7 +8,7 @@
 # """
 # module VEM
 
-using Statistics, LinearAlgebra, Random, StatsBase, Distributions, Distributed
+# using Statistics, LinearAlgebra, Random, StatsBase, Distributions, Distributed
 
 
 
