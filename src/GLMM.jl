@@ -305,10 +305,54 @@ end
 
 
 
-function miniBatch(G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},
-    X₀::Union{Matrix{Float64},Vector{Float64}},
-    T::Union{Array{Float64,3},Matrix{Float64}},S::Union{Matrix{Float64},Vector{Float64}},bsize::Int64=256;
-    LOCO::Bool=true,L::Int64=10,Π::Vector{Float64}=[1/size(X,2)],tol=1e-4)
+function randomizeData!(y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float64},
+    T::Array{Float64,3},S::Matrix{Float64})
+
+    #   Random.seed!(seed)
+    ivec = Vector(1:length(yt))
+    #randomize minibatches
+    shuffle!(MersenneTwister(123), ivec) # shuffle index
+    y[:] = y[ivec]
+    X[:,:] = X[ivec,:]
+    X₀[:,:] = X₀[ivec,:]
+    T[:,:,:] = T[ivec,:,:]
+    S[:,:] = S[ivec,:]    
+    
+end
+
+function randomizeData!(y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float64},
+    T::Array{Float64,2},S::Vector{Float64})
+
+    #   Random.seed!(seed)
+    ivec = Vector(1:length(yt))
+    #randomize minibatches
+    shuffle!(MersenneTwister(123), ivec) # shuffle index
+    y[:] = y[ivec]
+    X[:,:] = X[ivec,:]
+    X₀[:,:] = X₀[ivec,:]
+    T[:,:] = T[ivec,:]
+    S[:] = S[ivec]    
+    
+end
+
+
+function fineMapping_miniBatch(y,X,X₀,K;bsize::Int64=256,LOCO::Bool=true,L::Int64=10,Π::Vector{Float64}=[1/size(X,2)],tol=1e-5)
+   
+    M= length(y)
+    num_epoch = floor(M/bsize)
+    
+
+    T,S = svdK(K;LOCO=LOCO)
+    println("Eigen-decomposition is completed.")
+    randomizeData!(y,X,X₀,T,S)
+
+    
+
+
+
+   
+     
+
 
       
 
