@@ -2,43 +2,22 @@
 
 include("Utilities.jl")
 include("VEM.jl")
-
+include("GLM.jl")
 
 
 function init(yt::Vector{Float64},Xt₀::Matrix{Float64},S::Vector{Float64};tol=1e-4)
-    
+    n,c=size(Xt₀)
+
      τ2 = rand(1)[1]*0.001; #arbitray
     # may need to change
-     β = rand(size(Xt₀,2))*0.0001
-     ξ = rand(length(yt))*0.001
+     β = rand(c)*0.0001
+     ξ = rand(n)*0.001
       
      res= emGLMM(yt,Xt₀,S,τ2,β,ξ;tol=tol)
     
     return res
         
 end
-
-
-
-"""
-
-    GenoInfo(snp::Array{String,1},chr::Array{Any,1},pos::Array{Float64,1})
-
-A type struct includes information on genotype data
-
-# Arguements
-
-- `snp` : a vector of strings for genetic marker (or SNP) names
-- `chr` : a vector of Chromosome information corresponding to `snp`
-- `pos` : a vector of `snp` position in `cM`
-
-"""
-struct GenoInfo
-    snp::Array{String,1}
-    chr::Array{Any,1}
-    pos::Array{Float64,1} #positon 
-end
-
 
 
 
@@ -113,12 +92,12 @@ end
 function susieGLMM(L::Int64,Π::Vector{Float64},yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{Float64},
     S::Vector{Float64};tol=1e-4)
 
-# n, p = size(Xt)
+n, c = size(Xt₀)
 #initialization :
  σ0 = 0.1*ones(L);
  τ2 = rand(1)[1]*0.001; #arbitray
- β = rand(size(Xt₀,2))*0.0001
- ξ = rand(length(yt))*0.001
+ β = rand(c)*0.0001
+ ξ = rand(n)*0.001
 
     result = emGLMM(L,yt,Xt,Xt₀,S,τ2,β,ξ,σ0,Π;tol=tol)
         
@@ -336,28 +315,18 @@ function randomizeData!(y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float
 end
 
 
-function fineMapping_miniBatch(y,X,X₀,K;bsize::Int64=256,LOCO::Bool=true,L::Int64=10,Π::Vector{Float64}=[1/size(X,2)],tol=1e-5)
+# function fineMapping_miniBatch(y,X,X₀,K;bsize::Int64=256,LOCO::Bool=true,L::Int64=10,Π::Vector{Float64}=[1/size(X,2)],tol=1e-5)
    
-    M= length(y)
-    num_epoch = floor(M/bsize)
+#     M= length(y)
+#     num_epoch = floor(M/bsize)
     
 
-    T,S = svdK(K;LOCO=LOCO)
-    println("Eigen-decomposition is completed.")
-    randomizeData!(y,X,X₀,T,S)
-
-    
+#     T,S = svdK(K;LOCO=LOCO)
+#     println("Eigen-decomposition is completed.")
+#     randomizeData!(y,X,X₀,T,S)
 
 
-
-   
-     
-
-
-      
-
-
-end
+# end
 
 function fineMapping(G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float64},Vector{Float64}}=ones(length(y),1);
         K::Union{Array{Float64,3},Matrix{Float64}}=Matrix(1.0I,1,1),L::Int64=10,Π::Vector{Float64}=[1/size(X,2)],LOCO::Bool=true,

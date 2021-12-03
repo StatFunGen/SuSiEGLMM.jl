@@ -192,6 +192,25 @@ function Lambda(ξ::Float64)
 end
 
 
+"""
+
+    GenoInfo(snp::Array{String,1},chr::Array{Any,1},pos::Array{Float64,1})
+
+A type struct includes information on genotype data
+
+# Arguements
+
+- `snp` : a vector of strings for genetic marker (or SNP) names
+- `chr` : a vector of Chromosome information corresponding to `snp`
+- `pos` : a vector of `snp` position in `cM`
+
+"""
+struct GenoInfo
+    snp::Array{String,1}
+    chr::Array{Any,1}
+    pos::Array{Float64,1} #positon 
+end
+
 
 
 """    
