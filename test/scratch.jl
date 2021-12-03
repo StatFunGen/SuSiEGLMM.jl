@@ -21,7 +21,7 @@ y=convert(Vector{Float64},data[1][:,end])
 
 # kinship
 K=readdlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/pop_518fams_4000snps.cXX.txt") #518
-K_fam=readdlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/fam_100fams_4000snps.cXX.txt")
+# K_fam=readdlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/fam_100fams_4000snps.cXX.txt")
 
 
 info1= [info[1:20,:];info[1925:1929,:]]
@@ -58,30 +58,8 @@ L=3; Π = ones(p)/p
 # writedlm("./test/testinfo_loco.txt",[info[11:17,:];info[end-7:end,:]])
 # writedlm("./test/testK.txt",K[1:15,1:15])
 
-# K0=zeros(n,n,2);K2=copy(K);K0[:,:,1]=K2; K0[:,:,2]=K
-# T1,S1 = eigenK(K0)
-# T1,S1 = svdK(K0)
-
-
 # @time est1= fineMapping_GLMM(G,y,X,Covar,T1[:,:,1],S1[:,1];LOCO=false,tol=1e-4)
 
-# try with cholesky (provide stable eigenvalues)
-ch=cholesky(K)
-F=svd(ch.U)
-T2 = convert(Array{Float64,2}, F.Vt')
-@time est0= fineMapping_GLMM(G,y,X,Covar,T2,F.S.^2;LOCO=false,tol=1e-4)    
-
-
-F=svd(K;full=true)
-# the smallest eigen value close to 0
-# # 9.896090246630486e-13 replaced with 0
-# put back to Kinship
-# K1=F.U*Diagonal(F.S)*F.Vt
-# K≈K1 #true
-
-# svd again to the adjusted kinship
-# F1= svd(K1;full=true)
-# # 2.51072713180801e-17 :worse than K
 
 fineMapping_GLMM(G,y,X,Covar,F.U,F.S;LOCO=false,tol=1e-4)    
 @time est2= fineMapping_GLMM(G1,y,X1,Covar,F.U,F.S;LOCO=false, tol=1e-5)
@@ -91,10 +69,6 @@ for j=axes(K,1)
     K[j,j]=1.0
 end
 
-T,S = svdK(K;LOCO=false)
-if(Covar!= ones(length(y),1))
-    Covar = hcat(ones(length(y)),Covar)
-end
 
 
 
@@ -105,70 +79,17 @@ Xt, Ct, yt = rotate(y,X,Covar,T)
 
 
 
-#line by line debugging
-Xt, Ct, yt, init_est= initialization(y,X,Covar,T,S;tol=1e-4)
-    
-    # check if covariates are added as input and include the intercept. 
-    if(Covar!= ones(length(y),1))
-        Covar = hcat(ones(length(y)),Covar)
-    end
-    println(Covar)
-        
-#   
-                 Xt₀ = rotateX(X₀,T)
-#                    yt = rotateY(y,T)
-                   Xt, Ct, yt = rotate(y,X,X₀,F.U)   
-                   init_est= SuSiEGLMM.init(yt,Ct,F.S;tol=tol)
-       
-    return Xt, Xt₀, yt, init_est
-
-
-    τ2 = rand(1)[1]*0.5; #arbitray
-    # may need to change
-     β = zeros(axes(Ct,2)) 
-     ξ = rand(length(yt))*0.1
-      
-
-    emGLMM(yt,Xt₀,S,τ2,β,ξ;tol::Float64=1e-4)
-    
-    
-    n = length(yt)
-    ghat =zeros(n); Vg = zeros(n); λ = zeros(n)
-    
-    ghat2=zeros(axes(F.S)); τ2_new=zero(eltype(F.S)); 
-    ξ_new = zeros(n); β_new=zeros(axes(β))
-    
-    crit =1.0; el0=0.0;numitr=1
-      
-    
-    while (crit>=tol)
-        ###check again!
-         SuSiEGLMM.postG!(ghat,Vg,λ,yt,Ct,F.S,β,ξ,τ2)
-         ghat2, τ2_new = SuSiEGLMM.emG(Vg,ghat,F.S)
-         
-         SuSiEGLMM.mStep!(ξ_new,β_new,ghat,ghat2,λ,yt,Ct,β)
-        
-         el1=SuSiEGLMM.ELBO(ξ_new,β_new,τ2_new,ghat2,Vg,F.S,yt,Ct)
-     
-         # crit=el1-el0 
-         crit=norm(ξ_new-ξ)+norm(β_new-β)+abs(τ2_new-τ2)+abs(el1-el0)  
-        
-         ξ=ξ_new;β=β_new; τ2=τ2_new;el0=el1
-        
-          numitr +=1        
-    end
-    
-
-
-
+# K=I
+@time Xt, Ct, yt, init0= initialization(y,X1,ones(n,1),Matrix(1.0I,n,n),ones(n);tol=1e-5)
+@time est1= fineMapping_GLMM(G1,y,X1,ones(n,1),Matrix(1.0I,n,n),ones(n);LOCO=false, tol=1e-5)
+@time res=susieGLMM(10, ones(p)/p,y,X1,ones(n,1),ones(n);tol=1e-5)
 
 #pip 
- [1.0.-prod(1.0.-est1.α[j,:]) for j=1:p]
-
-
-
-#check loco
-# @everywhere include("GIT/SuSiEGLMM.jl/src/GLMM.jl")
+p=size(X,2)
+[[1.0.-prod(1.0.-est1.α[j,:]) for j =1:p] [1.0.-prod(1.0.-res.α[j,:]) for j =1:p]]
+[1.0.-prod(1.0.-res.α[j,:]) for j =1:p]
+    
+#########
 X1 = data[1][:,6:end-1]
  X1[X1.=="NA"].= missing
 for j =axes(X1,2)
@@ -181,22 +102,14 @@ X1 = convert(Array{Float64,2},X1)
 n,p=size(X1)
 G1=GenoInfo(info[:,2],info[:,1],info[:,3])
 
+# K0=zeros(n,n,2);K2=copy(K);K0[:,:,1]=K2; K0[:,:,2]=K
+# T1,S1 = svdK(K0)
+τ2true= 0.003
+btrue=[-sqrt(2);sqrt(2)]./2
 
-Xt, Ct, yt, init0= initialization(y,X1,Covar,T,S;tol=1e-4)
+idx=findall(G1.chr.==1)
 
-# L=5;Π = rand(p)
-
-
-
-# need to fix loco- postB! part.
-addprocs(2)
-@everywhere using Pkg
-@everywhere Pkg.activate("/Users/hyeonjukim/GIT/SuSiEGLMM.jl/")
-@everywhere using SuSiEGLMM
-
-@time est2= SuSiEGLMM.fineMapping_GLMM(G1,y,X1,Covar,T1,S1;LOCO=true, tol=1e-5)
-
-@time tstat, pvalue= scoreTest(G1,y,Covar,X1,K0;LOCO=true)
-
-#pip 
-[1.0-prod(1.0.-est2[2].α[j,:]) for j=axes(est2[2].α,1)]
+yL= [ones(n) X1[:,180]]*btrue
+g=MvNormal(τ2true*Matrix(1.0I,n,n))
+yR=rand(g)
+y= yL+yR
