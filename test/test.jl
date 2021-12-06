@@ -33,3 +33,6 @@ T1,S1=svdK(K1;LOCO=false)
 
 @time est0=fineMapping_GLMM(G,y1,X,ones(length(y1),1),T1,S1;L=10,LOCO=false,tol=1e-5)
 @time Xt, Ct, yt, init= initialization(y1,X,ones(length(y1),1),T1,S1;tol=1e-5)
+
+Xt, Ct, yt = rotate(y,X,C,T[:,:,1]) 
+@time res0=susieGLMM(L,Π,yt,Xt,Ct,S[:,1];tol=1e-4)
