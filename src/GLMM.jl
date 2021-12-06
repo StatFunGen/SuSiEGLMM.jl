@@ -10,8 +10,8 @@ function init(yt::Vector{Float64},Xt₀::Matrix{Float64},S::Vector{Float64};tol=
 
      τ2 = rand(1)[1]*0.001; #arbitray
     # may need to change
-     β = rand(c)*0.0001
-     ξ = rand(n)*0.001
+     β = rand(c)/sqrt(c)
+     ξ = rand(n)/sqrt(n)
       
      res= emGLMM(yt,Xt₀,S,τ2,β,ξ;tol=tol)
     
@@ -251,8 +251,10 @@ function fineMapping_GLMM(G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},
                 midx= findall(G.chr.== Chr[j])
                 Xt, Xt₀, yt, init0 = initialization(y,X[:,midx],X₀,T[:,:,j],S[:,j];tol=tol)
                            #check size of Π
+                           
                           if (Π==[1/size(X,2)]) #default value
-                              Π1 =repeat(Π,length(midx))
+                              m=length(midx)
+                              Π1 =repeat(1/m,m) #adjusting πⱼ
                              elseif (length(Π)!= size(X,2))
                                 println("Error. The length of Π should match $(size(X,2)) SNPs!")
                              else
@@ -268,6 +270,8 @@ function fineMapping_GLMM(G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},
             
                   if(length(Π)==1)
                      Π =repeat(Π,size(X,2))
+                  elseif (length(Π)!= size(X,2))
+                    println("Error. The length of Π should match $(size(X,2)) SNPs!")
                   end
                  
                  Xt, Xt₀, yt, init0 = initialization(y,X,X₀,T,S;tol=tol) 
