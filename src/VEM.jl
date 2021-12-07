@@ -257,7 +257,7 @@ function ELBO(L::Int64,ξ_new::Vector{Float64},β_new::Vector{Float64},σ0_new::
     A1::Matrix{Float64},B1::Matrix{Float64},AB2::Matrix{Float64},Sig1::Matrix{Float64},Π::Vector{Float64},
     y::Vector{Float64},X₀::Matrix{Float64})
 
-n=length(yt); p = size(B1,1); lnb =zero(1);
+n=length(y); p = size(B1,1); lnb =zero(1);
 
  ll= sum(log.(logistic.(ξ_new))- 0.5*ξ_new)+ y'*getXy('N',X₀,β_new) #lik
  # susie part
