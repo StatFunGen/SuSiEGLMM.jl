@@ -25,7 +25,7 @@ yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{Float64},S::Vector{Float64
         β::Vector{Float64},ξ::Vector{Float64},τ2::Float64,A0::Matrix{Float64},B0::Matrix{Float64})
     
     
-    λ[:]= 2Lambda.(ξ)
+    λ[:]= Lambda.(ξ)
    
     #posterior
     Vg[:]= 1.0./(λ+1.0./(τ2*S))
@@ -41,7 +41,7 @@ yt::Vector{Float64},Xt₀::Matrix{Float64},S::Vector{Float64},
         β::Vector{Float64},ξ::Vector{Float64},τ2::Float64)
     
     
-    λ[:]= 2Lambda.(ξ)
+    λ[:]= Lambda.(ξ)
     
     #posterior
     Vg[:]= 1.0./(λ+1.0./(τ2*S))
@@ -137,7 +137,7 @@ function postB!(A1::Matrix{Float64}, B1::Matrix{Float64}, Sig1::Matrix{Float64},
         ϕ[:]= getXy('T', X.^2,λ) # mle of precision
         AB0= A0.*B0;  # #old α_l*b_l
         AB1= zeros(axes(B0))
-       
+               
     
                 Sig1[:,:] =  1.0./(1.0./σ0'.+ ϕ)
           #l=1
@@ -226,15 +226,21 @@ function ELBO(L::Int64,ξ_new::Vector{Float64},β_new::Vector{Float64},σ0_new::
         A1::Matrix{Float64},B1::Matrix{Float64},AB2::Matrix{Float64},Sig1::Matrix{Float64},Π::Vector{Float64},
         ghat2::Vector{Float64},Vg::Vector{Float64},S::Vector{Float64},yt::Vector{Float64},Xt₀::Matrix{Float64})
 
-    n=length(yt); p = size(B1,1); lnb =zero(1);
+    n=length(yt); p = size(B1,1); lnb =zero(L);
     
      elbo0= ELBO(ξ_new,β_new,τ2_new,ghat2,Vg,S,yt,Xt₀) #null part
      # susie part
     for l= 1: L 
-     lnb  += A1[:,l]'*(log.(A1[:,l]./Π) - 0.5*log.(Sig1[:,l])) 
+        if(sum(A1[:,l].==0.0)>0) #avoid NaN by log(0)
+            lnb[l] = 0.0
+        else
+            lnb[l]  = A1[:,l]'*(log.(A1[:,l]./Π) - 0.5*log.(Sig1[:,l])) 
+        end
     end
+    
                
-      bl= lnb  +0.5*(sum(log.(σ0_new).- L)+ 0.5*sum(sum(AB2,dims=1)'./σ0_new))
+      bl= sum(lnb)+0.5*(sum(log.(σ0_new))- L)+ 0.5*sum(sum(AB2,dims=1)'./σ0_new)
+     
          
     return elbo0-bl
             
@@ -257,15 +263,19 @@ function ELBO(L::Int64,ξ_new::Vector{Float64},β_new::Vector{Float64},σ0_new::
     A1::Matrix{Float64},B1::Matrix{Float64},AB2::Matrix{Float64},Sig1::Matrix{Float64},Π::Vector{Float64},
     y::Vector{Float64},X₀::Matrix{Float64})
 
-n=length(y); p = size(B1,1); lnb =zero(1);
+n=length(y); p = size(B1,1); lnb =zero(L);
 
  ll= sum(log.(logistic.(ξ_new))- 0.5*ξ_new)+ y'*getXy('N',X₀,β_new) #lik
  # susie part
-for l= 1: L 
- lnb  += A1[:,l]'*(log.(A1[:,l]./Π) - 0.5*log.(Sig1[:,l])) 
+ for l= 1: L 
+    if(sum(A1[:,l].==0.0)>0) #avoid NaN by log(0)
+        lnb[l] = 0.0
+    else
+        lnb[l]  = A1[:,l]'*(log.(A1[:,l]./Π) - 0.5*log.(Sig1[:,l])) 
+    end
 end
            
-  bl= lnb  +0.5*(sum(log.(σ0_new).- L)+ 0.5*sum(sum(AB2,dims=1)'./σ0_new))
+bl= sum(lnb)  +0.5*(sum(log.(σ0_new))- L)+ 0.5*sum(sum(AB2,dims=1)'./σ0_new)
      
 return ll-bl
         
@@ -401,11 +411,11 @@ function emGLM(L::Int64,y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float
     σ0_new = zeros(L); ξ_new = zeros(n); β_new=zeros(axes(β))
     
     crit =1.0; el0=0.0;numitr=1
-      
+     
     
     while (crit>=tol)
         ###check again!
-    
+        λ[:]= Lambda.(ξ) 
         postB!(A1, B1, Sig1, λ,y,X,X₀,β,σ0,A0,B0,Π,L)
          σ0_new, AB2 = emB(A1, B1, Sig1,L)
          
