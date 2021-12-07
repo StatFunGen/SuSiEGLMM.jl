@@ -150,7 +150,7 @@ Returns 1-df score test statistic for case-control association tests that follow
 
 # Output
 
-- `T_stat` : a p x 1 vector of test statistic for case-control association tests.  The  test statistic is computed based on [reginie](https://www.nature.com/articles/s41588-021-00870-7).
+- `T_stat` : a p x 1 vector of test statistics for case-control association tests.  The  test statistic is computed based on [reginie](https://www.nature.com/articles/s41588-021-00870-7).
 
 """
 function scoreTest(G::GenoInfo,y::Vector{Float64},X₀::Union{Matrix{Float64},Vector{Float64}},X::Matrix{Float64},
