@@ -185,10 +185,13 @@ function logistic(ξ::Float64)
     
 end
 
-# λ(ξ)
+# 2λ(ξ)
 function Lambda(ξ::Float64)
-   
-    return 0.25*tanh(ξ/2)/ξ    
+        if(ξ==0.0) #adjust 0/0 case by L'Hopital
+            return 0.25
+        else
+            return 0.5*tanh(ξ/2)/ξ    
+        end
 end
 
 
