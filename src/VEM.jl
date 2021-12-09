@@ -207,17 +207,23 @@ function mStep!(ξ_new::Vector{Float64},β_new::Vector{Float64},A1::Matrix{Float
 
 # ξ_new= zeros(axes(yt))
 # β_new= zeros(axes(Xt₀,2))
+   L= size(A1,2)
+  U = zeros(L,L)
   ŷ₀ = getXy('N',X₀,β)
-  AB= getXy('N',X,sum(A1.*B1,dims=2)[:,1])
+#   AB= getXy('N',X,sum(A1.*B1,dims=2)[:,1])
+    AB = getXX('N',X,'N',A1.*B1) # nxL
+    B2= sum(AB,dims=2)[:,1]
+    ξ_new[:] = getXy('N',X.^2.0,sum(AB2,dims=2)[:,1]) 
+  for j in eachindex(y)
+        # ξ_new[j]  = sum(X[j,:].^2.0.*(sum(AB2,dims=2))[:,1]) # E(Xb)^2  
+        U = AB[j,:]*AB[j,:]'
+        ξ_new[j] = ξ_new[j]+ sum(U)-tr(U)
+  end
+#   ξ_new[:] = sum(X*Diagonal(sum(AB2,dims=2))*X',dims=2)
+    
 
-#   for j in eachindex(y)
-#         ξ_new[j]  = sum(X[j,:].^2.0.*(sum(AB2,dims=2))[:,1]) # E(Xb)^2  
-#   end
-  ξ_new[:] = sum(X*Diagonal(sum(AB2,dims=2))*X',dims=2)
-        
-
-   
-   ξ_new[:] = sqrt.(ξ_new + ŷ₀.^2  + 2(ŷ₀.*AB))
+    
+   ξ_new[:] = sqrt.(ξ_new + ŷ₀.^2  + 2(ŷ₀.*B2))
    a=findall(ξ_new.<0.0)
    
     println("ξ_new at $(nitr) iteration")
@@ -225,7 +231,7 @@ function mStep!(ξ_new::Vector{Float64},β_new::Vector{Float64},A1::Matrix{Float
     display(ξ_new[a])
   
 # β_new[:]= symXX('T',sqrt.(λ).*Xt₀)\getXy('T',Xt₀,(yt- λ.*(AB + ghat)))
- β_new[:]= getXX('T',X₀,'N',(λ.*X₀))\getXy('T',X₀,(y- λ.*AB))
+ β_new[:]= getXX('T',X₀,'N',(λ.*X₀))\getXy('T',X₀,(y- λ.*B2))
     
 end
 
@@ -270,11 +276,12 @@ end
 # for GLM
 function ELBO(L::Int64,ξ_new::Vector{Float64},β_new::Vector{Float64},σ0_new::Vector{Float64},
     A1::Matrix{Float64},B1::Matrix{Float64},AB2::Matrix{Float64},Sig1::Matrix{Float64},Π::Vector{Float64},
-    y::Vector{Float64},X₀::Matrix{Float64})
+    y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float64})
 
-n=length(y); p = size(B1,1); lnb =zeros(L);
+# n=length(y); p = size(B1,1);
+ lnb =zeros(L);
 
- ll= sum(log.(logistic.(ξ_new))- 0.5*ξ_new)+ y'*getXy('N',X₀,β_new) #lik
+ ll= sum(log.(logistic.(ξ_new))- 0.5*ξ_new)+ y'*(getXy('N',X₀,β_new)+ getXy('N',X,sum(A1.*B1,dims=2)[:,1])) #lik
  # susie part
  for l= 1: L 
     if(sum(A1[:,l].==0.0)>0) #avoid NaN by log(0)
@@ -425,29 +432,29 @@ function emGLM(L::Int64,y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float
     while (crit>=tol)
         ###check again!
         λ[:]= Lambda.(ξ) 
-        println("inter=$(numitr) and λ:")
-        println(λ)
+        # println("inter=$(numitr) and λ:")
+        # println(λ)
         postB!(A1, B1, Sig1, λ,y,X,X₀,β,σ0,A0,B0,Π,L)
-        println("A1,B1,Sig1")
-        display(A1)
-        display(B1)
-        display(Sig1)
+        # println("A1,B1,Sig1")
+        # display(A1)
+        # display(B1)
+        # display(Sig1)
          σ0_new, AB2 = emB(A1, B1, Sig1,L)
-         println("σ0,AB2")
-         display(σ0_new)
-         display(AB2)
+        #  println("σ0,AB2")
+        #  display(σ0_new)
+        #  display(AB2)
          mStep!(ξ_new,β_new,A1,B1,AB2,λ,y,X,X₀,β;nitr=numitr)
-         println("new ξ, β")
-         display(ξ_new)
-         display(β)
+        #  println("new ξ, β")
+        #  display(ξ_new)
+        #  display(β)
 
         
-         el1=ELBO(L,ξ_new,β_new,σ0_new,A1,B1,AB2,Sig1,Π,y,X₀)
-         println("elbo = $(el1)")
+         el1=ELBO(L,ξ_new,β_new,σ0_new,A1,B1,AB2,Sig1,Π,y,X,X₀)
+        #  println("elbo = $(el1)")
      
-         # crit=el1-el0 
+        #  crit=el1-el0 
          #check later for performance
-         crit=norm(ξ_new-ξ)+norm(β_new-β)+abs(el1-el0) +norm(A1-A0)+norm(B1-B0)
+         crit=norm(ξ_new-ξ)+norm(β_new-β)+abs(el1-el0) +norm(B1-B0)
          
          ξ=ξ_new;β=β_new;σ0=σ0_new;el0=el1;A0=A1;B0=B1
         

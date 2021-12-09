@@ -5,6 +5,7 @@ export susieGLM
 function susieGLM(L::Int64,Π::Vector{Float64},y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float64};tol=1e-5)
   
     n, c =size(X₀)
+    y1= zeros(n)
   
     if(X₀!= ones(n,1)) #&&(size(X₀,2)>1)
         X₀ = hcat(ones(n),X₀)
@@ -15,8 +16,8 @@ function susieGLM(L::Int64,Π::Vector{Float64},y::Vector{Float64},X::Matrix{Floa
  σ0 = 0.1*ones(L);
  β = rand(c)/sqrt(c)
  ξ = rand(n)/sqrt(n)
- y[:] =y-0.5*ones(n) # centered y
-    result = emGLM(L,y,X,X₀,β,ξ,σ0,Π;tol=tol)
+ y1[:] =y-0.5*ones(n) # centered y
+    result = emGLM(L,y1,X,X₀,β,ξ,σ0,Π;tol=tol)
         
 return result
 
