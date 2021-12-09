@@ -90,8 +90,9 @@ yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{Float64},β::Vector{Float6
             B1[:,1] = Diagonal(Sig1[:,1])*getXy('T',Xt,Z0) 
            # compute α_1
             Z =  0.5*(getXy('T',Xt,Z0)./sqrt.(ϕ)).^2
-            A0[:,1] = Π.*exp.(Z./(1.0.+ϕ/σ0[1]))./sqrt.(ϕ.^(-1).+1)
-            A0[:,1] = A0[:,1]./maximum(A0[:,1]) # eliminate max for numerical stability
+            # A0[:,1] = Π.*exp.(Z./(1.0.+ϕ/σ0[1]))./sqrt.(ϕ.^(-1).+1)
+            A0[:,1] = log.(Π)+ Z./(1.0.+ϕ/σ0[1]) - 0.5*log.(σ0[1]*ϕ.^(-1).+1)
+            A0[:,1] = exp.(A0[:,1].-maximum(A0[:,1])) # eliminate max for numerical stability
             A1[:,1]= A0[:,1]/sum(A0[:,1]) # scale to 0< α_1<1
             AB1[:,1]= A1[:,1].*B1[:,1] #update α_1*b_1
     
@@ -100,8 +101,9 @@ yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{Float64},β::Vector{Float6
             Z0= yt - λ.*(getXy('N',Xt₀,β) + getXy('N',Xt,sum(hcat(AB1[:,1:l-1],AB0[:,l+1:end]),dims=2)[:,1])+ghat)
             B1[:,l] = Diagonal(Sig1[:,l])*getXy('T',Xt,Z0)
             Z =  0.5*(getXy('T',Xt,Z0)./sqrt.(ϕ)).^2
-            A0[:,l] = Π.*exp.(Z./(1.0.+ϕ/σ0[l]))./sqrt.(ϕ.^(-1).+1)
-            A0[:,l] = A0[:,l]./maximum(A0[:,l])
+            # A0[:,l] = Π.*exp.(Z./(1.0.+ϕ/σ0[l]))./sqrt.(ϕ.^(-1).+1)
+            A0[:,l] = log.(Π)+ Z./(1.0.+ϕ/σ0[l]) - 0.5*log.(σ0[l]*ϕ.^(-1).+1)
+            A0[:,l] = exp.(A0[:,l].-maximum(A0[:,l])) 
             A1[:,l] = A0[:,l]/sum(A0[:,l])
             AB1[:,l]= A1[:,l].*B1[:,l]
       end
@@ -145,8 +147,9 @@ function postB!(A1::Matrix{Float64}, B1::Matrix{Float64}, Sig1::Matrix{Float64},
                 B1[:,1] = Diagonal(Sig1[:,1])*getXy('T',X,Z0) 
                # compute α_1
                 Z =  0.5*(getXy('T',X,Z0)./sqrt.(ϕ)).^2
-                A0[:,1] = Π.*exp.(Z./(1.0.+ϕ/σ0[1]))./sqrt.(σ0[1]*ϕ.^(-1).+1)
-                A0[:,1] = A0[:,1]./maximum(A0[:,1]) # eliminate max for numerical stability
+                # A0[:,1] = Π.*exp.(Z./(1.0.+ϕ/σ0[1]))./sqrt.(σ0[1]*ϕ.^(-1).+1)
+                A0[:,1] = log.(Π)+ Z./(1.0.+ϕ/σ0[1]) - 0.5*log.(σ0[1]*ϕ.^(-1).+1)
+                A0[:,1] = exp.(A0[:,1].-maximum(A0[:,1])) # eliminate max for numerical stability
                 A1[:,1]= A0[:,1]/sum(A0[:,1]) # scale to 0< α_1<1
                 AB1[:,1]= A1[:,1].*B1[:,1] #update α_1*b_1
         
@@ -155,8 +158,9 @@ function postB!(A1::Matrix{Float64}, B1::Matrix{Float64}, Sig1::Matrix{Float64},
                 Z0= y - λ.*(getXy('N',X₀,β) + getXy('N',X,sum(hcat(AB1[:,1:l-1],AB0[:,l+1:end]),dims=2)[:,1]))
                 B1[:,l] = Diagonal(Sig1[:,l])*getXy('T',X,Z0)
                 Z =  0.5*(getXy('T',X,Z0)./sqrt.(ϕ)).^2
-                A0[:,l] = Π.*exp.(Z./(1.0.+ϕ/σ0[l]))./sqrt.(σ0[l]*ϕ.^(-1).+1)
-                A0[:,l] = A0[:,1]./maximum(A0[:,l]) # eliminate max for numerical stability
+                # A0[:,l] = Π.*exp.(Z./(1.0.+ϕ/σ0[l]))./sqrt.(σ0[l]*ϕ.^(-1).+1)
+                A0[:,l] = log.(Π)+ Z./(1.0.+ϕ/σ0[l]) - 0.5*log.(σ0[l]*ϕ.^(-1).+1)
+                A0[:,l] = exp.(A0[:,l].-maximum(A0[:,l])) 
                 A1[:,l] = A0[:,l]/sum(A0[:,l])
                 AB1[:,l]= A1[:,l].*B1[:,l]
           end
@@ -249,7 +253,7 @@ function ELBO(L::Int64,ξ_new::Vector{Float64},β_new::Vector{Float64},σ0_new::
         if(sum(A1[:,l].==0.0)>0) #avoid NaN by log(0)
             lnb[l] = 0.0
         else
-            lnb[l]  = A1[:,l]'*(log.(A1[:,l]./Π) - 0.5*log.(Sig1[:,l])) 
+            lnb[l]  = A1[:,l]'*(log.(A1[:,l])-log.(Π) - 0.5*log.(Sig1[:,l])) 
         end
     end
     
@@ -267,7 +271,7 @@ function ELBO(ξ_new::Vector{Float64},β_new::Vector{Float64},τ2_new::Float64,
    
     n=length(yt);
     ll= sum(log.(logistic.(ξ_new))- 0.5*ξ_new)+ yt'*getXy('N',Xt₀,β_new) #lik
-    gl = -0.5*(n*log(τ2_new)+ sum(log.(S./Vg))- 1.0) - sum(ghat2./S)/τ2_new # g
+    gl = -0.5*(n*log(τ2_new)+ sum(log.(S)-log.(Vg))- 1.0) - sum(ghat2./S)/τ2_new # g
     
     return ll+gl
     
@@ -287,7 +291,7 @@ function ELBO(L::Int64,ξ_new::Vector{Float64},β_new::Vector{Float64},σ0_new::
     if(sum(A1[:,l].==0.0)>0) #avoid NaN by log(0)
         lnb[l] = 0.0
     else
-        lnb[l]  = A1[:,l]'*(log.(A1[:,l]./Π) - 0.5*log.(Sig1[:,l])) 
+        lnb[l]  = A1[:,l]'*(log.(A1[:,l])-log.(Π) - 0.5*log.(Sig1[:,l]))
     end
 end
            
