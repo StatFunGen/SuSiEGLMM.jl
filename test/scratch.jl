@@ -84,7 +84,7 @@ Xt, Ct, yt = rotate(y,X,Covar,T)
 @time est1= fineMapping_GLMM(G1,y,X1,ones(n,1),Matrix(1.0I,n,n),ones(n);LOCO=false, tol=1e-5)
 @time res=susieGLMM(10, ones(p)/p,y,X1,ones(n,1),ones(n);tol=1e-5)
 
-@time glmr=susieGLM(10, ones(p)/p,y,X1,ones(n,1);tol=1e-5)  
+@time glmr=susieGLM(10, ones(p)/p,y,X1,ones(n,1);tol=1e-4)  
 #pip 
 p=size(X,2)
 [[1.0.-prod(1.0.-est1.α[j,:]) for j =1:p] [1.0.-prod(1.0.-res.α[j,:]) for j =1:p]]
@@ -105,7 +105,7 @@ G1=GenoInfo(info[:,2],info[:,1],info[:,3])
 
 # K0=zeros(n,n,2);K2=copy(K);K0[:,:,1]=K2; K0[:,:,2]=K
 # T1,S1 = svdK(K0)
-τ2true= 0.003
+τ2true= 0.25
 btrue=[-sqrt(2);sqrt(2)]./2
 
 idx=findall(G1.chr.==1)
