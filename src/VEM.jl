@@ -471,24 +471,3 @@ end
 
 
 
-# # drawing initial values 
-# function initialValues(p::Int64, L::Int64 σ0::Vector{Float64})
-   
-   
-   
-#     #draw pi from gamma~multi(1,p) 
-#     γ = Multinomial(1, p)
-#     Π = rand(γ,L)
-#     b
-#     σ0 = 0.1*ones(L)
-#      for l=1:L
-#         b=Normal(0,σ0[l])
-#         B0[:,l] = rand(b)*Π[:,l]
-#     end
-    
-# end
-
-
-
-
-# end
