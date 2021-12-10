@@ -1,4 +1,4 @@
-export svdK, eigenK,rotate,logistic,Lambda,Seed
+export svdK, eigenK,rotate,logistic,Lambda,Seed, dropCol
 
 #Spectral decomposition
 """
@@ -171,6 +171,13 @@ function symXX(t::Char,X::Array{Float64,2})
     return XtX
     
 end
+
+
+function dropCol(B::Matrix{Float64},l::Int64)
+
+    return B[:,1:end.!= l]
+  end
+  
 
 """
 

@@ -116,7 +116,7 @@ yR=rand(g)
 y= yL+yR
 
 ######## the same simulation in R-version
-Random.seed!(1138)
+Random.seed!(113)
 
 n=100; p=10; L=1;
 b_true=zeros(p);

@@ -5,7 +5,7 @@ using GLM
 
 function susieGLM(L::Int64,Π::Vector{Float64},y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float64};tol=1e-5)
   
-    n, c =size(X₀)
+    n =size(X₀,1)
     y1= zeros(n)
   
     if(X₀!= ones(n,1)) #&&(size(X₀,2)>1)
@@ -19,8 +19,8 @@ function susieGLM(L::Int64,Π::Vector{Float64},y::Vector{Float64},X::Matrix{Floa
 #  ξ = rand(n)/sqrt(n)
  
  β0 = glm(X₀,y,Binomial()) |> coef
- AB0 =sum(repeat(Π,outer=(1,L)).*σ0',dims=2)[:,1] ; 
- ξ0 =sqrt.(getXy('N',X.^2.0,sum(AB0,dims=2))+getXy('N',X₀,β0).^2)
+ ν0 =sum(repeat(Π,outer=(1,L)).*σ0',dims=2)[:,1] ; 
+ ξ0 =sqrt.(getXy('N',X.^2.0,ν0)+getXy('N',X₀,β0).^2)
  
 
     result = emGLM(L,y1,X,X₀,β0,ξ0,σ0,Π;tol=tol)
