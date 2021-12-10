@@ -114,3 +114,27 @@ yL= [ones(n) X1[:,180]]*btrue
 g=MvNormal(τ2true*Matrix(1.0I,n,n))
 yR=rand(g)
 y= yL+yR
+
+######## the same simulation in R-version
+Random.seed!(1138)
+
+n=100; p=10; L=1;
+b_true=zeros(p);
+B=100;
+b_1s=zeros(B); res=[];
+for j = 1:B
+
+    b_true[1]= randn(1)[1] 
+    b_1s[j] = b_true[1]
+    X=randn(n,p)
+    Y= logistic.(X*b_true) .<rand(n) #generating binary outcome
+    Y=convert(Vector{Float64},Y)
+    res0= susieGLM(L, ones(p)/p,Y,X,ones(n,1);tol=1e-4) 
+    res=[res;res0]
+end
+
+b̂ = [res[j].α[1]*res[j].ν[1] for j=1:B]
+α̂ = [res[j].α[1] for j=1:B]
+using UnicodePlots
+scatterplot(b_1s,b̂,xlabel= "True effects", ylabel="Posterior estimate")
+scatterplot(b_1s,α̂, xlabel="True effects",ylabel="pip")

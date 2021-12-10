@@ -218,15 +218,14 @@ end
 
 """    
 
-    Seed(M::Int64,replace=::Bool=false)
+    Seed(M::Int64)
     
-Reseed random number generators to workers (or processes) by sampling different number of seeds between 1 and M for distributed computing.  
+Reseed random number generators to assign workers (or processes) different number of seeds (increased by 1) for reproducible distributed computing.  
 
     
 # Arguments
 
-- `M` : an integer.  Set the maximum number of seeds.  
-- `replace` : Bool.  Default is false. Sampling with/without replacement.
+- `M` : an integer.  Set the seed number.  
 
 # Examples
     
@@ -240,13 +239,11 @@ julia> Seed(20)
 ```
 
 """    
-function Seed(M::Int64,replace::Bool=false)
+function Seed(M::Int64)
         
         np=nprocs(); pid=procs()
-        if (M < np) && (!replace)
-            println("Error. The random number generator should be greater than the number of nprocs, $(np).")
-        end
-        seeds = sample(1:M, np, replace=replace)
+        
+        seeds = collect(M:1:M+np-1)
         
         for j =1:np
             remotecall_fetch(()->Random.seed!(seeds[i]),pid[i])
