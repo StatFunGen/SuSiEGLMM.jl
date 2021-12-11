@@ -132,7 +132,7 @@ function postB!(A1::Matrix{Float64}, B1::Matrix{Float64}, Sig1::Matrix{Float64},
     y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float64},β::Vector{Float64},σ0::Vector{Float64},A0::Matrix{Float64},B0::Matrix{Float64},Π::Vector{Float64},L::Int64)
         
         pidx=axes(B0,1)
-        ϕ = zeros(pidx); Z=copy(ϕ);
+        ϕ = zeros(pidx); Z=zeros(pidx);
         
         Z0= similar(Z, axes(y));
         
@@ -155,7 +155,7 @@ function postB!(A1::Matrix{Float64}, B1::Matrix{Float64}, Sig1::Matrix{Float64},
          for l= 1: L
                
                 # Z0= y - λ.*(getXy('N',X₀,β) + getXy('N',X,sum(hcat(AB1[:,1:l-1],AB0[:,l+1:end]),dims=2)[:,1]))
-                Z0= y - λ.*(getXy('N',X₀,β) + getXy('N',X,sum(dropCol(AB0,l),dims=2)[:,1]))
+                Z0= (y - λ.*(getXy('N',X₀,β) + getXy('N',X,sum(dropCol(AB0,l),dims=2)[:,1])))
                 Z =  getXy('T',X,Z0)
                 B1[:,l] = Diagonal(Sig1[:,l])*Z #posterior bₗ
                   # compute α_1

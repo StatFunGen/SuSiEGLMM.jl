@@ -143,13 +143,13 @@ b̂1 = zeros(B);b̂2=zeros(B)
 end
 
 # ╔═╡ f361c74c-3a0d-4b1c-b14b-274662a676ad
-[b̂1 b̂2]
+[b̂1 B_1s b̂2 B_2s]
 
 # ╔═╡ 6e2fd5da-8a01-4983-bd0a-06c92f7aee32
-
+begin
 α̂₁ = [maximum(res1[j].α[1,:]) for j=1:B]
-
-
+findall(α̂₁.<0)
+end
 
 # ╔═╡ 6c8275e7-f484-4845-951e-fbc542e64b30
 α̂₂ = [maximum(res1[j].α[2,:]) for j=1:B]
@@ -610,9 +610,9 @@ uuid = "3f19e933-33d8-53b3-aaab-bd5110c3b7a0"
 # ╠═6cfbe9be-7269-477f-bfe9-c102b716984b
 # ╟─64aa8bfa-b72c-40fd-a911-986a953899b7
 # ╠═5f70ae45-6734-4dc1-980c-cee3624f52cb
-# ╟─9d8a159e-de52-4cb0-8c52-8252c447b76d
+# ╠═9d8a159e-de52-4cb0-8c52-8252c447b76d
 # ╠═f361c74c-3a0d-4b1c-b14b-274662a676ad
-# ╟─6e2fd5da-8a01-4983-bd0a-06c92f7aee32
+# ╠═6e2fd5da-8a01-4983-bd0a-06c92f7aee32
 # ╟─6c8275e7-f484-4845-951e-fbc542e64b30
 # ╠═537710b9-2aa5-49b0-8ec9-84dcd3464448
 # ╟─15bc17ae-b233-4394-a0c4-fbaec6c4fff6
