@@ -44,8 +44,6 @@ $(@bind n Slider(100:1000))
 p: 
 $(@bind p NumberField(10:100, default=10))
 
-L: 
-$(@bind L NumberField(1:15, default=1 ))
 
 B: 
 $(@bind B Slider(100:1000))
@@ -61,14 +59,17 @@ Random.seed!(1138);
 # ╔═╡ 774a0988-a3e5-4d48-8ba3-9fccc55753d8
 md"
 
-* Start simulation :
+### Start simulation :
+
+#### L=1
 "
 
 # ╔═╡ 111151f8-7d15-47aa-8330-361fd0403866
 begin 
 	
 
-# n=100; p=10; L=1;
+# n=100; p=10; 
+# L=1;
 b_true=zeros(p);
 # B=100;
 b_1s=zeros(B); res=[];
@@ -79,7 +80,7 @@ for j = 1:B
     X=randn(n,p)
     Y= logistic.(X*b_true) .<rand(n) #generating binary outcome
     Y=convert(Vector{Float64},Y)
-    res0= susieGLM(L, ones(p)/p,Y,X,ones(n,1);tol=1e-4) 
+    res0= susieGLM(1, ones(p)/p,Y,X,ones(n,1);tol=1e-4) 
     res=[res;res0]
 end
 end;
@@ -96,6 +97,74 @@ scatterplot(b_1s,b̂,xlabel= "True effects", ylabel="Posterior estimate")
 
 # ╔═╡ 1bcbef2f-f5cc-4495-8d7b-54c6ca82ae47
 scatterplot(b_1s,α̂, xlabel="True effects",ylabel="PIP")
+
+# ╔═╡ 6cfbe9be-7269-477f-bfe9-c102b716984b
+[b̂[end-2] b_1s[end-2] res[end-2].elbo]
+
+# ╔═╡ 64aa8bfa-b72c-40fd-a911-986a953899b7
+md"
+#### L=2
+"
+
+# ╔═╡ 5f70ae45-6734-4dc1-980c-cee3624f52cb
+begin
+
+# L=2;
+B_true=zeros(p);
+# B=100;
+B_1s=zeros(B); res1=[];
+B_2s=zeros(B)
+for j = 1:B
+
+    B_true[1]= randn(1)[1] 
+	B_true[2]= randn(1)[1]
+    B_1s[j] = B_true[1]
+	B_2s[j] = B_true[2]
+    X=randn(n,p)
+    Y= logistic.(X*B_true) .<rand(n) #generating binary outcome
+    Y=convert(Vector{Float64},Y)
+    res00= susieGLM(2, ones(p)/p,Y,X,ones(n,1);tol=1e-3) 
+    res1=[res1;res00]
+end
+
+
+
+
+end;
+
+# ╔═╡ 9d8a159e-de52-4cb0-8c52-8252c447b76d
+begin
+b̂1 = zeros(B);b̂2=zeros(B)
+	for j=1:B
+		est = sum(res1[j].α.*res1[j].ν;dims=2)
+        b̂1[j] = est[1]
+		b̂2[j] = est[2]
+	end
+end
+
+# ╔═╡ f361c74c-3a0d-4b1c-b14b-274662a676ad
+[b̂1 B_1s b̂2 B_2s]
+
+# ╔═╡ 6e2fd5da-8a01-4983-bd0a-06c92f7aee32
+begin
+α̂₁ = [maximum(res1[j].α[1,:]) for j=1:B]
+findall(α̂₁.<0)
+end
+
+# ╔═╡ 6c8275e7-f484-4845-951e-fbc542e64b30
+α̂₂ = [maximum(res1[j].α[2,:]) for j=1:B]
+
+# ╔═╡ 537710b9-2aa5-49b0-8ec9-84dcd3464448
+scatterplot(B_1s,b̂1,xlabel= "True effects", ylabel="Posterior estimate",title="b̂₁")
+
+# ╔═╡ 15bc17ae-b233-4394-a0c4-fbaec6c4fff6
+scatterplot(B_2s,b̂2,xlabel= "True effects", ylabel="Posterior estimate",title="b̂₂")
+
+# ╔═╡ c9c6b3b5-24fe-4949-8176-f1ee8cb36aa9
+scatterplot(B_1s,α̂₁, xlabel="True effects",ylabel="PIP",title= "α̂₁")
+
+# ╔═╡ 6e851362-ac85-4a3a-9be3-9108b1bb2abb
+scatterplot(B_2s,α̂₂, xlabel="True effects",ylabel="PIP",title="α̂₂")
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -533,10 +602,21 @@ uuid = "3f19e933-33d8-53b3-aaab-bd5110c3b7a0"
 # ╟─21313e12-c0cb-4b39-aae3-9cc065a7af2a
 # ╟─9352441a-20c0-4594-bde5-96c3fbf45541
 # ╟─774a0988-a3e5-4d48-8ba3-9fccc55753d8
-# ╟─111151f8-7d15-47aa-8330-361fd0403866
-# ╟─7ed716f7-2887-405a-9cee-f9f503e53af2
-# ╟─8e5a2b03-e081-4218-93e3-6ebb8532befe
-# ╟─f7c0d83e-d001-497f-8622-9fdcea9e0f50
-# ╟─1bcbef2f-f5cc-4495-8d7b-54c6ca82ae47
+# ╠═111151f8-7d15-47aa-8330-361fd0403866
+# ╠═7ed716f7-2887-405a-9cee-f9f503e53af2
+# ╠═8e5a2b03-e081-4218-93e3-6ebb8532befe
+# ╠═f7c0d83e-d001-497f-8622-9fdcea9e0f50
+# ╠═1bcbef2f-f5cc-4495-8d7b-54c6ca82ae47
+# ╠═6cfbe9be-7269-477f-bfe9-c102b716984b
+# ╟─64aa8bfa-b72c-40fd-a911-986a953899b7
+# ╠═5f70ae45-6734-4dc1-980c-cee3624f52cb
+# ╠═9d8a159e-de52-4cb0-8c52-8252c447b76d
+# ╠═f361c74c-3a0d-4b1c-b14b-274662a676ad
+# ╠═6e2fd5da-8a01-4983-bd0a-06c92f7aee32
+# ╟─6c8275e7-f484-4845-951e-fbc542e64b30
+# ╠═537710b9-2aa5-49b0-8ec9-84dcd3464448
+# ╟─15bc17ae-b233-4394-a0c4-fbaec6c4fff6
+# ╟─c9c6b3b5-24fe-4949-8176-f1ee8cb36aa9
+# ╟─6e851362-ac85-4a3a-9be3-9108b1bb2abb
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

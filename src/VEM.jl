@@ -132,41 +132,44 @@ function postB!(A1::Matrix{Float64}, B1::Matrix{Float64}, Sig1::Matrix{Float64},
     y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float64},β::Vector{Float64},σ0::Vector{Float64},A0::Matrix{Float64},B0::Matrix{Float64},Π::Vector{Float64},L::Int64)
         
         pidx=axes(B0,1)
-        ϕ = zeros(pidx); Z=copy(ϕ);
+        ϕ = zeros(pidx); Z=zeros(pidx);
         
         Z0= similar(Z, axes(y));
         
         ϕ[:]= getXy('T', X.^2,λ) # mle of precision
         AB0= A0.*B0;  # #old α_l*b_l
-        AB1= zeros(axes(B0))
-               
-    
-                Sig1[:,:] =  1.0./(1.0./σ0'.+ ϕ)
+            
+        Sig1[:,:] =  1.0./(1.0./σ0'.+ ϕ) #posterior Σₗ
           #l=1
-        Z0= y - λ.*(getXy('N',X₀,β) + getXy('N',X,sum(AB0[:,2:end],dims=2)[:,1]))
-                B1[:,1] = Diagonal(Sig1[:,1])*getXy('T',X,Z0) 
-               # compute α_1
-                Z =  0.5*(getXy('T',X,Z0)./sqrt.(ϕ)).^2
-                # A0[:,1] = Π.*exp.(Z./(1.0.+ϕ/σ0[1]))./sqrt.(σ0[1]*ϕ.^(-1).+1)
-                A0[:,1] = log.(Π)+ Z./(1.0.+ϕ/σ0[1]) - 0.5*log.(σ0[1]*ϕ.^(-1).+1)
-                A0[:,1] = exp.(A0[:,1].-maximum(A0[:,1])) # eliminate max for numerical stability
-                A1[:,1]= A0[:,1]/sum(A0[:,1]) # scale to 0< α_1<1
-                AB1[:,1]= A1[:,1].*B1[:,1] #update α_1*b_1
+        # Z0= y - λ.*(getXy('N',X₀,β) + getXy('N',X,sum(AB0[:,2:end],dims=2)[:,1]))
+        #         Z =  getXy('T',X,Z0)
+        #         B1[:,1] = Diagonal(Sig1[:,1])*Z #posterior bₗ
+        #        # compute α_1
+        #         # Z =  0.5*(getXy('T',X,Z0)./sqrt.(ϕ)).^2
+        #         # A0[:,1] = Π.*exp.(Z./(1.0.+ϕ/σ0[1]))./sqrt.(σ0[1]*ϕ.^(-1).+1)
+        #         A0[:,1] = log.(Π)+ 0.5*Z.^2 .*Sig1[:,1] + 0.5*log.(Sig1[:,1])
+        #         A0[:,1] = exp.(A0[:,1].-maximum(A0[:,1])) # eliminate max for numerical stability
+        #         A1[:,1]= A0[:,1]/sum(A0[:,1]) # scale to 0< α_1<1
+        #         AB1[:,1]= A1[:,1].*B1[:,1] #update α_1*b_1
         
-         for l= 2: L
+         for l= 1: L
                
-                Z0= y - λ.*(getXy('N',X₀,β) + getXy('N',X,sum(hcat(AB1[:,1:l-1],AB0[:,l+1:end]),dims=2)[:,1]))
-                B1[:,l] = Diagonal(Sig1[:,l])*getXy('T',X,Z0)
-                Z =  0.5*(getXy('T',X,Z0)./sqrt.(ϕ)).^2
+                # Z0= y - λ.*(getXy('N',X₀,β) + getXy('N',X,sum(hcat(AB1[:,1:l-1],AB0[:,l+1:end]),dims=2)[:,1]))
+                Z0= (y - λ.*(getXy('N',X₀,β) + getXy('N',X,sum(dropCol(AB0,l),dims=2)[:,1])))
+                Z =  getXy('T',X,Z0)
+                B1[:,l] = Diagonal(Sig1[:,l])*Z #posterior bₗ
+                  # compute α_1
                 # A0[:,l] = Π.*exp.(Z./(1.0.+ϕ/σ0[l]))./sqrt.(σ0[l]*ϕ.^(-1).+1)
-                A0[:,l] = log.(Π)+ Z./(1.0.+ϕ/σ0[l]) - 0.5*log.(σ0[l]*ϕ.^(-1).+1)
-                A0[:,l] = exp.(A0[:,l].-maximum(A0[:,l])) 
-                A1[:,l] = A0[:,l]/sum(A0[:,l])
-                AB1[:,l]= A1[:,l].*B1[:,l]
+                A1[:,l] = log.(Π)+ 0.5*Z.^2 .*Sig1[:,l] + 0.5*log.(Sig1[:,l]) 
+                A1[:,l] = exp.(A1[:,l].-maximum(A1[:,l])) # eliminate max for numerical stability
+                A1[:,l] = A1[:,l]/sum(A1[:,l]) # scale to 0< α_1<1
+                AB0[:,l]= A1[:,l].*B1[:,l] #update α_1*b_1
           end
         
 end
     
+
+
 
 # M-step: H1
 function mStep!(ξ_new::Vector{Float64},β_new::Vector{Float64},A1::Matrix{Float64},B1::Matrix{Float64},AB2::Matrix{Float64},
@@ -212,27 +215,26 @@ function mStep!(ξ_new::Vector{Float64},β_new::Vector{Float64},A1::Matrix{Float
 # ξ_new= zeros(axes(yt))
 # β_new= zeros(axes(Xt₀,2))
    L= size(A1,2)
-  U = zeros(L,L)
-  ŷ₀ = getXy('N',X₀,β)
+   U = zeros(L,L)
+   ŷ₀ = getXy('N',X₀,β)
 #   AB= getXy('N',X,sum(A1.*B1,dims=2)[:,1])
     AB = getXX('N',X,'N',A1.*B1) # nxL
     B2= sum(AB,dims=2)[:,1]
     ξ_new[:] = getXy('N',X.^2.0,sum(AB2,dims=2)[:,1]) 
-  for j in eachindex(y)
-        # ξ_new[j]  = sum(X[j,:].^2.0.*(sum(AB2,dims=2))[:,1]) # E(Xb)^2  
+ 
+    for j in eachindex(y)
         U = AB[j,:]*AB[j,:]'
         ξ_new[j] = ξ_new[j]+ sum(U)-tr(U)
   end
-#   ξ_new[:] = sum(X*Diagonal(sum(AB2,dims=2))*X',dims=2)
+
     
 
     
    ξ_new[:] = sqrt.(ξ_new + ŷ₀.^2  + 2(ŷ₀.*B2))
-   a=findall(ξ_new.<0.0)
-   
-    println("ξ_new at $(nitr) iteration")
-    println(a)
-    display(ξ_new[a])
+#    a=findall(ξ_new.<0.0) 
+#     println("ξ_new at $(nitr) iteration")
+#     println(a)
+#     display(ξ_new[a])
   
 # β_new[:]= symXX('T',sqrt.(λ).*Xt₀)\getXy('T',Xt₀,(yt- λ.*(AB + ghat)))
  β_new[:]= getXX('T',X₀,'N',(λ.*X₀))\getXy('T',X₀,(y- λ.*B2))
