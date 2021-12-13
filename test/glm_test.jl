@@ -68,28 +68,54 @@ md"
 begin 
 	
 
-# n=100; p=10; 
+# # n=100; p=10; 
 # L=1;
-b_true=zeros(p);
-# B=100;
-b_1s=zeros(B); res=[];
-for j = 1:B
+# b_true=zeros(p);
+# # B=100;
+# b_1s=zeros(B); res=[];
+# for j = 1:B
 
-    b_true[1]= randn(1)[1] 
-    b_1s[j] = b_true[1]
-    X=randn(n,p)
-    Y= logistic.(X*b_true) .<rand(n) #generating binary outcome
-    Y=convert(Vector{Float64},Y)
-    res0= susieGLM(1, ones(p)/p,Y,X,ones(n,1);tol=1e-4) 
-    res=[res;res0]
-end
+#     b_true[1]= randn(1)[1] 
+#     b_1s[j] = b_true[1]
+#     X=randn(n,p)
+#     Y= logistic.(X*b_true) .<rand(n) #generating binary outcome
+
+# 	Y=convert(Vector{Float64},Y)
+#     res0= susieGLM(1, ones(p)/p,Y,X,ones(n,1);tol=1e-4) 
+#     res=[res;res0]
+# end
+
+X=readdlm("../testdata/dataX.csv",',';skipstart=1)[:,2:end];
+Y=readdlm("../testdata/dataY.csv",',';skipstart=1)[:,end]
+
+res0= susieGLM(1, ones(p)/p,Y,X,ones(n,1);tol=1e-3) 
+
+
+	
 end;
 
+# ╔═╡ 7fb9a3f7-424b-4bab-91cf-cba1517c2767
+b_1s
+
 # ╔═╡ 7ed716f7-2887-405a-9cee-f9f503e53af2
-b̂ = [res[j].α[1]*res[j].ν[1] for j=1:B]
+# b̂ = [res[j].α[1]*res[j].ν[1] for j=1:B]
+b̂ = res0.ν
 
 # ╔═╡ 8e5a2b03-e081-4218-93e3-6ebb8532befe
-α̂ = [res[j].α[1] for j=1:B]
+# α̂ = [res[j].α[1] for j=1:B]
+α̂ =res0.α
+
+# ╔═╡ a06b16d3-6342-47a0-a835-f9832b957d7b
+res0.Σ
+
+# ╔═╡ 2c1c9351-0529-46d8-8013-70d405d8d723
+res0.β
+
+# ╔═╡ 58fb9b8d-bd94-4267-a12a-306b7df254bf
+res0.ξ
+
+# ╔═╡ 5e146eaf-b515-424f-9bde-9c9b62a2d80f
+res0.elbo
 
 # ╔═╡ f7c0d83e-d001-497f-8622-9fdcea9e0f50
 scatterplot(b_1s,b̂,xlabel= "True effects", ylabel="Posterior estimate")
@@ -600,11 +626,16 @@ uuid = "3f19e933-33d8-53b3-aaab-bd5110c3b7a0"
 # ╟─d6b57884-d5d5-4165-b384-d85f3c95d310
 # ╟─fe5f4aff-600f-4bd2-aecf-d15e0ad1a736
 # ╟─21313e12-c0cb-4b39-aae3-9cc065a7af2a
-# ╟─9352441a-20c0-4594-bde5-96c3fbf45541
+# ╠═9352441a-20c0-4594-bde5-96c3fbf45541
 # ╟─774a0988-a3e5-4d48-8ba3-9fccc55753d8
 # ╠═111151f8-7d15-47aa-8330-361fd0403866
+# ╠═7fb9a3f7-424b-4bab-91cf-cba1517c2767
 # ╠═7ed716f7-2887-405a-9cee-f9f503e53af2
 # ╠═8e5a2b03-e081-4218-93e3-6ebb8532befe
+# ╠═a06b16d3-6342-47a0-a835-f9832b957d7b
+# ╠═2c1c9351-0529-46d8-8013-70d405d8d723
+# ╠═58fb9b8d-bd94-4267-a12a-306b7df254bf
+# ╠═5e146eaf-b515-424f-9bde-9c9b62a2d80f
 # ╠═f7c0d83e-d001-497f-8622-9fdcea9e0f50
 # ╠═1bcbef2f-f5cc-4495-8d7b-54c6ca82ae47
 # ╠═6cfbe9be-7269-477f-bfe9-c102b716984b

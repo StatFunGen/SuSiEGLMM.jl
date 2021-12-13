@@ -157,6 +157,7 @@ function postB!(A1::Matrix{Float64}, B1::Matrix{Float64}, Sig1::Matrix{Float64},
                 # Z0= y - λ.*(getXy('N',X₀,β) + getXy('N',X,sum(hcat(AB1[:,1:l-1],AB0[:,l+1:end]),dims=2)[:,1]))
                 Z0= (y - λ.*(getXy('N',X₀,β) + getXy('N',X,sum(dropCol(AB0,l),dims=2)[:,1])))
                 Z =  getXy('T',X,Z0)
+                writedlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/nums-julia.txt",Z)
                 B1[:,l] = Diagonal(Sig1[:,l])*Z #posterior bₗ
                   # compute α_1
                 # A0[:,l] = Π.*exp.(Z./(1.0.+ϕ/σ0[l]))./sqrt.(σ0[l]*ϕ.^(-1).+1)
