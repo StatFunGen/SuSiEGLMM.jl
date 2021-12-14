@@ -136,10 +136,11 @@ function postB!(A1::Matrix{Float64}, B1::Matrix{Float64}, Sig1::Matrix{Float64},
         
         Z0= similar(Z, axes(y));
         
-        ϕ[:]= getXy('T', X.^2,λ) # mle of precision
+        ϕ= getXy('T', X.^2,λ) # mle of precision
         AB0= A0.*B0;  # #old α_l*b_l
             
         Sig1[:,:] =  1.0./(1.0./σ0'.+ ϕ) #posterior Σₗ
+        writedlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/sig1_julia.txt",Sig1)
           #l=1
         # Z0= y - λ.*(getXy('N',X₀,β) + getXy('N',X,sum(AB0[:,2:end],dims=2)[:,1]))
         #         Z =  getXy('T',X,Z0)
@@ -160,8 +161,11 @@ function postB!(A1::Matrix{Float64}, B1::Matrix{Float64}, Sig1::Matrix{Float64},
                 writedlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/nums-julia.txt",Z)
                 B1[:,l] = Diagonal(Sig1[:,l])*Z #posterior bₗ
                   # compute α_1
-                # A0[:,l] = Π.*exp.(Z./(1.0.+ϕ/σ0[l]))./sqrt.(σ0[l]*ϕ.^(-1).+1)
+                # A1[:,l] = exp.(log.(Π)-0.5*(Z.^2)./(1.0.+ϕ./σ0[l]) +0.5*log.(σ0[l]*ϕ.^(-1).+1))
+              
+
                 A1[:,l] = log.(Π)+ 0.5*Z.^2 .*Sig1[:,l] + 0.5*log.(Sig1[:,l]) 
+
                 A1[:,l] = exp.(A1[:,l].-maximum(A1[:,l])) # eliminate max for numerical stability
                 A1[:,l] = A1[:,l]/sum(A1[:,l]) # scale to 0< α_1<1
                 AB0[:,l]= A1[:,l].*B1[:,l] #update α_1*b_1
@@ -430,7 +434,7 @@ function emGLM(L::Int64,y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float
     A0 =repeat(Π,outer=(1,L)) ; 
     B0=zeros(p,L); AB2=zeros(p,L)
    
-    A1 =zeros(p,L); B1=zeros(p,L); Sig1=zeros(p,L)
+    A1 =copy(A0); B1=copy(B0); Sig1=zeros(p,L)
     σ0_new = zeros(L); ξ_new = zeros(n); β_new=zeros(axes(β))
     
     crit =1.0; el0=0.0;numitr=1
@@ -438,7 +442,7 @@ function emGLM(L::Int64,y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float
     
     while (crit>=tol)
         ###check again!
-        λ[:]= Lambda.(ξ) 
+        λ= Lambda.(ξ) 
         # println("inter=$(numitr) and λ:")
         # println(λ)
         postB!(A1, B1, Sig1, λ,y,X,X₀,β,σ0,A0,B0,Π,L)
@@ -463,7 +467,7 @@ function emGLM(L::Int64,y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float
          #check later for performance
          crit=norm(ξ_new-ξ)+norm(β_new-β)+abs(el1-el0) +norm(B1-B0)
          
-         ξ=ξ_new;β=β_new;σ0=σ0_new;el0=el1;A0=A1;B0=B1
+         ξ=copy(ξ_new);β=copy(β_new);σ0=copy(σ0_new);el0=copy(el1);A0=copy(A1);B0=copy(B1)
         
           numitr +=1
         

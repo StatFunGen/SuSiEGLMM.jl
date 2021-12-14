@@ -138,3 +138,4 @@ b̂ = [res[j].α[1]*res[j].ν[1] for j=1:B]
 using UnicodePlots
 scatterplot(b_1s,b̂,xlabel= "True effects", ylabel="Posterior estimate")
 scatterplot(b_1s,α̂, xlabel="True effects",ylabel="pip")
+

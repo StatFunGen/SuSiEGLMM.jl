@@ -8,7 +8,7 @@ L = 1
 V = 1
 beta_true = rep(0, p)
 
-B = 100
+B = 1
 b_1s = numeric(B)
 susie.fits.easy = list() # logistic SuSiE fits
 logistic.fits.easy = list() # logistic regression fits
