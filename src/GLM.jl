@@ -12,7 +12,7 @@ function susieGLM(L::Int64,Π::Vector{Float64},y::Vector{Float64},X::Matrix{Floa
         X₀ = hcat(ones(n),X₀)
     end
          
-    y1[:] =y.-0.5 # centered y
+    y1 =y.-0.5 # centered y
 #initialization :
  σ0 = ones(L);
 #  β = rand(c)/sqrt(c)

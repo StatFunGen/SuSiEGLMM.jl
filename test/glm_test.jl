@@ -46,7 +46,7 @@ $(@bind p NumberField(10:100, default=10))
 
 
 B: 
-$(@bind B Slider(100:1000))
+$(@bind B Slider(1:100))
 
 "
 
@@ -54,7 +54,7 @@ $(@bind B Slider(100:1000))
 n, B
 
 # ╔═╡ 9352441a-20c0-4594-bde5-96c3fbf45541
-Random.seed!(1138);
+Random.seed!(138);
 
 # ╔═╡ 774a0988-a3e5-4d48-8ba3-9fccc55753d8
 md"
@@ -63,6 +63,9 @@ md"
 
 #### L=1
 "
+
+# ╔═╡ b97e0c7e-1703-4b7f-8814-4d0fac5d1d91
+pwd()
 
 # ╔═╡ 111151f8-7d15-47aa-8330-361fd0403866
 begin 
@@ -79,27 +82,71 @@ for j = 1:B
     b_1s[j] = b_true[1]
     X=randn(n,p)
     Y= logistic.(X*b_true) .<rand(n) #generating binary outcome
-    Y=convert(Vector{Float64},Y)
+
+	Y=convert(Vector{Float64},Y)
     res0= susieGLM(1, ones(p)/p,Y,X,ones(n,1);tol=1e-4) 
     res=[res;res0]
 end
+
+# X=readdlm("../testdata/dataX1.csv",',';skipstart=1)[:,2:end];
+# Y=readdlm("../testdata/dataY1.csv",',';skipstart=1)[:,end]
+
+# res0= susieGLM(1, ones(p)/p,Y,X,ones(n,1);tol=1e-3) 
+
+
+	
 end;
+
+# ╔═╡ 82ebaab3-9a24-4af8-81b7-8f69f929a691
+
 
 # ╔═╡ 7ed716f7-2887-405a-9cee-f9f503e53af2
 b̂ = [res[j].α[1]*res[j].ν[1] for j=1:B]
+# b̂ = res0.ν
+
+# ╔═╡ da9f4384-fcd8-4ee6-8e2f-521e9ad2f101
+res[1].α[1]
+
+# ╔═╡ fabbf0a6-1b95-4f2b-869d-f43cf34f77c6
+res[1].ν[1]
+
+# ╔═╡ ca50fd67-f99d-49a8-9206-6cfa1f0703d7
+b_1s[1]
+
+# ╔═╡ 274a298e-e076-44c2-8c5b-5b0736c12c48
+b_1s
 
 # ╔═╡ 8e5a2b03-e081-4218-93e3-6ebb8532befe
 α̂ = [res[j].α[1] for j=1:B]
+# α̂ =res0.α
+
+# ╔═╡ a06b16d3-6342-47a0-a835-f9832b957d7b
+res0.Σ
+
+# ╔═╡ 2c1c9351-0529-46d8-8013-70d405d8d723
+res0.β
+
+# ╔═╡ 58fb9b8d-bd94-4267-a12a-306b7df254bf
+res0.ξ
+
+# ╔═╡ 5e146eaf-b515-424f-9bde-9c9b62a2d80f
+res0.elbo
+
+# ╔═╡ 6bb5497e-6bf7-4945-bae0-e2d1ac4c8452
+(n,p,B)
 
 # ╔═╡ f7c0d83e-d001-497f-8622-9fdcea9e0f50
 scatterplot(b_1s,b̂,xlabel= "True effects", ylabel="Posterior estimate")
+
+
+# ╔═╡ 5aa4bea9-ba24-4be4-8d27-41cecf63c944
 
 
 # ╔═╡ 1bcbef2f-f5cc-4495-8d7b-54c6ca82ae47
 scatterplot(b_1s,α̂, xlabel="True effects",ylabel="PIP")
 
 # ╔═╡ 6cfbe9be-7269-477f-bfe9-c102b716984b
-[b̂[end-2] b_1s[end-2] res[end-2].elbo]
+[b̂l[end-2] b_1s[end-2] res1[end-2].elbo]
 
 # ╔═╡ 64aa8bfa-b72c-40fd-a911-986a953899b7
 md"
@@ -107,30 +154,30 @@ md"
 "
 
 # ╔═╡ 5f70ae45-6734-4dc1-980c-cee3624f52cb
-begin
+# begin
 
-# L=2;
-B_true=zeros(p);
-# B=100;
-B_1s=zeros(B); res1=[];
-B_2s=zeros(B)
-for j = 1:B
+# # L=2;
+# B_true=zeros(p);
+# # B=100;
+# B_1s=zeros(B); res1=[];
+# B_2s=zeros(B)
+# for j = 1:B
 
-    B_true[1]= randn(1)[1] 
-	B_true[2]= randn(1)[1]
-    B_1s[j] = B_true[1]
-	B_2s[j] = B_true[2]
-    X=randn(n,p)
-    Y= logistic.(X*B_true) .<rand(n) #generating binary outcome
-    Y=convert(Vector{Float64},Y)
-    res00= susieGLM(2, ones(p)/p,Y,X,ones(n,1);tol=1e-3) 
-    res1=[res1;res00]
-end
-
-
+#     B_true[1]= randn(1)[1] 
+# 	B_true[2]= randn(1)[1]
+#     B_1s[j] = B_true[1]
+# 	B_2s[j] = B_true[2]
+#     X=randn(n,p)
+#     Y= logistic.(X*B_true) .<rand(n) #generating binary outcome
+#     Y=convert(Vector{Float64},Y)
+#     res00= susieGLM(2, ones(p)/p,Y,X,ones(n,1);tol=1e-3) 
+#     res1=[res1;res00]
+# end
 
 
-end;
+
+
+# end;
 
 # ╔═╡ 9d8a159e-de52-4cb0-8c52-8252c447b76d
 begin
@@ -599,13 +646,25 @@ uuid = "3f19e933-33d8-53b3-aaab-bd5110c3b7a0"
 # ╠═4eddfd44-06ae-46c4-8dd9-d843ca70619e
 # ╟─d6b57884-d5d5-4165-b384-d85f3c95d310
 # ╟─fe5f4aff-600f-4bd2-aecf-d15e0ad1a736
-# ╟─21313e12-c0cb-4b39-aae3-9cc065a7af2a
-# ╟─9352441a-20c0-4594-bde5-96c3fbf45541
+# ╠═21313e12-c0cb-4b39-aae3-9cc065a7af2a
+# ╠═9352441a-20c0-4594-bde5-96c3fbf45541
 # ╟─774a0988-a3e5-4d48-8ba3-9fccc55753d8
+# ╠═b97e0c7e-1703-4b7f-8814-4d0fac5d1d91
 # ╠═111151f8-7d15-47aa-8330-361fd0403866
+# ╠═82ebaab3-9a24-4af8-81b7-8f69f929a691
 # ╠═7ed716f7-2887-405a-9cee-f9f503e53af2
+# ╠═da9f4384-fcd8-4ee6-8e2f-521e9ad2f101
+# ╠═fabbf0a6-1b95-4f2b-869d-f43cf34f77c6
+# ╠═ca50fd67-f99d-49a8-9206-6cfa1f0703d7
+# ╠═274a298e-e076-44c2-8c5b-5b0736c12c48
 # ╠═8e5a2b03-e081-4218-93e3-6ebb8532befe
+# ╠═a06b16d3-6342-47a0-a835-f9832b957d7b
+# ╠═2c1c9351-0529-46d8-8013-70d405d8d723
+# ╠═58fb9b8d-bd94-4267-a12a-306b7df254bf
+# ╠═5e146eaf-b515-424f-9bde-9c9b62a2d80f
+# ╠═6bb5497e-6bf7-4945-bae0-e2d1ac4c8452
 # ╠═f7c0d83e-d001-497f-8622-9fdcea9e0f50
+# ╠═5aa4bea9-ba24-4be4-8d27-41cecf63c944
 # ╠═1bcbef2f-f5cc-4495-8d7b-54c6ca82ae47
 # ╠═6cfbe9be-7269-477f-bfe9-c102b716984b
 # ╟─64aa8bfa-b72c-40fd-a911-986a953899b7
