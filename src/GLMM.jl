@@ -6,14 +6,16 @@ include("GLM.jl")
 
 
 function init(yt::Vector{Float64},Xt₀::Matrix{Float64},S::Vector{Float64};tol=1e-4)
-    n,c=size(Xt₀)
+    n=length(yt)
 
-     τ2 = rand(1)[1]*0.001; #arbitray
+     τ0 = rand(1)[1]/sqrt(n); #arbitray
     # may need to change
-     β = rand(c)/sqrt(c)
-     ξ = rand(n)/sqrt(n)
+    #  β = rand(c)/sqrt(c)
+    #  ξ = rand(n)/sqrt(n)
+     β0 = glm(Xt₀,yt,Binomial()) |> coef
+     ξ0 =sqrt.(getXy('N',Xt₀,β0).^2+ τ2*S)
       
-     res= emGLMM(yt,Xt₀,S,τ2,β,ξ;tol=tol)
+     res= emGLMM(yt,Xt₀,S,τ0,β0,ξ0;tol=tol)
     
     return res
         

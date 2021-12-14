@@ -1,11 +1,11 @@
-export svdK, eigenK,rotate,logistic,Lambda,Seed, dropCol
+export svdK,rotate,logistic,Lambda,Seed, dropCol
 
 #Spectral decomposition
 """
 
-     eigenK(K::Union{Array{Float64,3},Matrix{Float64}};LOCO::Bool=true)
+svdK(K::Union{Array{Float64,3},Matrix{Float64}};LOCO::Bool=true)
 
-Returns a 3d-array (or a matrix) of eigen vectors (orthogonal matrix) and the corresponding matrix (or vector) of eigen values if `LOCO` is true (false).
+Returns a 3d-array (or a matrix) of orthogonal vectors and the corresponding matrix (or vector) of singluar values if `LOCO` is true (false).
 
 # Arguments
 
@@ -17,41 +17,11 @@ Returns a 3d-array (or a matrix) of eigen vectors (orthogonal matrix) and the co
 
 # Output
 
-- `T` : a 3d-array (or matrix) of eigen vectors 
-- `S` : a matrix (or vector) of eigen values
+- `T` : a 3d-array (or matrix) of orthogonal vectors
+- `S` : a matrix (or vector) of singluar values in descending order
 
 
 """
-function eigenK(K::Union{Array{Float64,3},Matrix{Float64}};LOCO::Bool=true,δ::Float64=0.001)
-    
-   if (LOCO)
-       nchr = size(K,3);  n = size(K,1);
-       S = zeros(n,nchr);
-       T = zeros(n,n,nchr);
-    
-        for j =1:nchr ## add parallelization later
-           if(!isposdef(K[:,:,j])) # check pdf
-                K[:,:,j]=K[:,:,j]+ (abs(minimum(svdvals(K[:,:,j])))+δ)*I
-           end
-                
-       #spectral decomposition
-         F=eigen(K[:,:,j])
-         T[:,:,j], S[:,j] = F.vectors, F.values
-        end
-       
-        return  T, S
-    else
-          if(!isposdef(K)) # check pdf
-                K=K+ (abs(minimum(svdvals(K)))+δ)*I
-           end
-        F=eigen(K)
-        return F.vectors, F.values
-        
-    end
-        
-end
-
-
 function svdK(K::Union{Array{Float64,3},Matrix{Float64}};LOCO::Bool=true,δ::Float64=0.001)
     
     if (LOCO)
@@ -62,23 +32,23 @@ function svdK(K::Union{Array{Float64,3},Matrix{Float64}};LOCO::Bool=true,δ::Flo
          for j =1:nchr 
             # may consider to svd from the genotype data
             if(!isposdef(K[:,:,j])) # check pdf
-                 K[:,:,j]=K[:,:,j]+ (abs(minimum(svdvals(K[:,:,j])))+δ)*I
+                 K[:,:,j]=K[:,:,j]+ (abs(eigmin(K[:,:,j]))+δ)*I
             end
                  
         #cholesky & svd for numerical stability
-          C=cholesky(K[:,:,j])
-          F=svd(C.U)
-          T[:,:,j], S[:,j] = F.Vt, F.S.^2
+        #   C=cholesky(K[:,:,j])
+          F=svd(K[:,:,j])
+          T[:,:,j], S[:,j] = F.Vt, F.S
          end
         
          return  T, S
      else
            if(!isposdef(K)) # check pdf
-                 K=K+ (abs(minimum(svdvals(K)))+δ)*I
+                 K=K+ (abs(eigmin(K))+δ)*I
             end
-         C=cholesky(K)   
-         F=svd(C.U)
-         return F.Vt, F.S.^2
+        #  C=cholesky(K)   
+         F=svd(K)
+         return F.Vt, F.S
          
      end
 
@@ -136,7 +106,7 @@ function rotateY(y::Vector{Float64},T::Matrix{Float64})
     n=length(y)
     
     #U'X, U'X₀, U'(y-1/2)
-    yt= BLAS.gemv('N',T,(y-0.5*ones(n)))
+    yt= BLAS.gemv('N',T,(y.-0.5))
        
     return yt
     
