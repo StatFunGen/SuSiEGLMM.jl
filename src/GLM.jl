@@ -14,12 +14,12 @@ function susieGLM(L::Int64,Π::Vector{Float64},y::Vector{Float64},X::Matrix{Floa
          
     y1 =y.-0.5 # centered y
 #initialization :
- σ0 = ones(L);
+ σ0 = 0.1*ones(L);
 #  β = rand(c)/sqrt(c)
 #  ξ = rand(n)/sqrt(n)
  
  β0 = glm(X₀,y,Binomial()) |> coef
- ν0 =sum(repeat(Π,outer=(1,L)).*σ0',dims=2)[:,1] ; 
+ ν0 =sum(repeat(Π,outer=(1,L)).*σ0',dims=2)[:,1] ; #ν²0
  ξ0 =sqrt.(getXy('N',X.^2.0,ν0)+getXy('N',X₀,β0).^2)
  
 

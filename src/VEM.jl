@@ -467,7 +467,7 @@ function emGLM(L::Int64,y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float
          #check later for performance
          crit=norm(ξ_new-ξ)+norm(β_new-β)+abs(el1-el0) +norm(B1-B0)
          
-         ξ=copy(ξ_new);β=copy(β_new);σ0=copy(σ0_new);el0=copy(el1);A0=copy(A1);B0=copy(B1)
+         ξ=ξ_new;β=β_new;σ0=σ0_new;el0=el1;A0=A1;B0=B1
         
           numitr +=1
         

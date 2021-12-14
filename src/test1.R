@@ -17,12 +17,16 @@ for (i in 1:B) {
   b_1s[i] = beta_true[1]
   # make independent N(0, 1) covariates
   X = matrix(rnorm(n * p), nrow = n)
-  filename=paste("testdata/dataX",i,".csv",sep="")
+  filename=paste0("testdata/dataX",i,".csv",sep="")
   write.csv(X,filename)
   # make response
   Y = rbinom(n, 1, exp(X %*% beta_true) / (1 + exp(X %*% beta_true)))
-  filename1=paste("testdata/dataY",i,".csv",sep="")
+  filename1=paste0("testdata/dataY",i,".csv",sep="")
   write.csv(Y,filename1)
+   # X=read.csv("testdata/dataX-julia.csv",sep="\t",header=FALSE)
+   # Y=read.csv("testdata/dataY-julia.csv",sep = "\t",header = FALSE)
+   # X<-as.matrix(X)
+   # Y<-as.numeric(unlist(Y))
   susie.fits.easy[[i]] = susie_logistic_VB(Y, X, L, V)
-  logistic.fits.easy[[i]] = glm(Y ~ X, family = "binomial")
+  # logistic.fits.easy[[i]] = glm(Y ~ X, family = "binomial")
 }
