@@ -5,16 +5,10 @@ include("VEM.jl")
 include("GLM.jl")
 
 
-function init(yt::Vector{Float64},Xt₀::Matrix{Float64},S::Vector{Float64};tol=1e-4)
+function init(yt::Vector{Float64},Xt₀::Matrix{Float64},S::Vector{Float64},β::Vector{Float64},ξ::Vector{Float64},τ²::Float64;tol=1e-4)
    
-     #initialization
-    #  τ0 = rand(1)[1]/sqrt(n); #arbitray
-    τ0=0.4
-    
-     β0 = glm(Xt₀,yt,Binomial()) |> coef
-     ξ0 =sqrt.(getXy('N',Xt₀,β0).^2+ τ2*S)
       
-     res= emGLMM(yt,Xt₀,S,τ0,β0,ξ0;tol=tol)
+     res= emGLMM(yt,Xt₀,S,τ²,β,ξ;tol=tol)
     
     return res
         
@@ -56,16 +50,25 @@ Returns initial values for parameters `τ2, β, ξ` to run fine-mapping for SuSi
 function initialization(y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float64},Vector{Float64}},T::Matrix{Float64},
         S::Vector{Float64};tol=1e-4)
     
+        n=length(y)
     # check if covariates are added as input and include the intercept. 
-    if(X₀!= ones(length(y),1)) #&&(size(X₀,2)>1)
+    if(X₀!= ones(n,1)) #&&(size(X₀,2)>1)
         X₀ = hcat(ones(length(y)),X₀)
     end
     
         
+    
 #                    Xt₀ = rotateX(X₀,T)
 #                    yt = rotateY(y,T)
-                   Xt, Xt₀, yt = rotate(y,X,X₀,T)   
-                   init_est= init(yt,Xt₀,S;tol=tol)
+     Xt, Xt₀, yt = rotate(y,X,X₀,T)   
+     y0= getXy('N',T,y) # rotate w/o centering for β0
+    #initialization
+     τ0 = rand(1)[1]; #arbitray
+    # τ0=0.4    
+    β0 = glm(Xt₀,y0,Binomial()) |> coef
+    ξ0 =sqrt.(getXy('N',Xt₀,β0).^2+ τ0*S)
+
+    init_est= init(yt,Xt₀,S,β0,ξ0,τ0;tol=tol)
        
     return Xt, Xt₀, yt, init_est
 end
@@ -85,22 +88,7 @@ function susieGLMM(L::Int64,Π::Vector{Float64},yt::Vector{Float64},Xt::Matrix{F
     
 end 
 
-#try with random small initial values to test H1 model
-function susieGLMM(L::Int64,Π::Vector{Float64},yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{Float64},
-    S::Vector{Float64};tol=1e-4)
 
-n, c = size(Xt₀)
-#initialization :
- σ0 = 0.1*ones(L);
- τ2 = rand(1)[1]*0.001; #arbitray
- β = rand(c)*0.0001
- ξ = rand(n)*0.001
-
-    result = emGLMM(L,yt,Xt,Xt₀,S,τ2,β,ξ,σ0,Π;tol=tol)
-        
-return result
-
-end 
 
 # compute score test statistic : need to check again
 function computeT(init0::Null_est,yt::Vector{Float64},Xt₀::Matrix{Float64},Xt::Matrix{Float64})
@@ -110,7 +98,7 @@ function computeT(init0::Null_est,yt::Vector{Float64},Xt₀::Matrix{Float64},Xt:
         p̂ = logistic.(r₀)
         Γ  = p̂.*(1.0.-p̂)
         
-        proj= I - Xt₀*symXX('T',sqrt.(Γ).*Xt₀)\(Xt₀'Diagonal(Γ)) 
+        proj= I - Xt₀*(symXX('T',sqrt.(Γ).*Xt₀)\(Xt₀'Diagonal(Γ)))
         G̃ = getXX('N',proj,'N',Xt)
     
         Tstat= zeros(p)
@@ -254,7 +242,7 @@ function fineQTL_glmm(G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},
                            
                           if (Π==[1/size(X,2)]) #default value
                               m=length(midx)
-                              Π1 =repeat(1/m,m) #adjusting πⱼ
+                              Π1 =ones(m)/m #adjusting πⱼ
                              elseif (length(Π)!= size(X,2))
                                 println("Error. The length of Π should match $(size(X,2)) SNPs!")
                              else

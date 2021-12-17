@@ -98,7 +98,7 @@ end
 end;
 
 # ╔═╡ 82ebaab3-9a24-4af8-81b7-8f69f929a691
-
+res[1].σ0
 
 # ╔═╡ 7ed716f7-2887-405a-9cee-f9f503e53af2
 b̂ = [res[j].α[1]*res[j].ν[1] for j=1:B]
@@ -138,6 +138,9 @@ y=readdlm("../testdata/dataY-julia.csv")
 
 # ╔═╡ ccae629d-0c5a-4379-b265-855e0b9c188d
 scatter(y[:,1])
+
+# ╔═╡ 0877b54b-705f-40e1-8fb6-e11a9815d771
+
 
 # ╔═╡ 64aa8bfa-b72c-40fd-a911-986a953899b7
 md"
@@ -1194,7 +1197,7 @@ version = "0.9.1+5"
 # ╠═e3bd3b42-5994-11ec-245d-234f51bd5b71
 # ╠═4eddfd44-06ae-46c4-8dd9-d843ca70619e
 # ╟─d6b57884-d5d5-4165-b384-d85f3c95d310
-# ╠═fe5f4aff-600f-4bd2-aecf-d15e0ad1a736
+# ╟─fe5f4aff-600f-4bd2-aecf-d15e0ad1a736
 # ╠═21313e12-c0cb-4b39-aae3-9cc065a7af2a
 # ╠═9352441a-20c0-4594-bde5-96c3fbf45541
 # ╟─774a0988-a3e5-4d48-8ba3-9fccc55753d8
@@ -1213,6 +1216,7 @@ version = "0.9.1+5"
 # ╠═1bcbef2f-f5cc-4495-8d7b-54c6ca82ae47
 # ╠═5e1f0018-9f06-4997-93e9-55c4f4486b4d
 # ╠═ccae629d-0c5a-4379-b265-855e0b9c188d
+# ╠═0877b54b-705f-40e1-8fb6-e11a9815d771
 # ╟─64aa8bfa-b72c-40fd-a911-986a953899b7
 # ╠═5f70ae45-6734-4dc1-980c-cee3624f52cb
 # ╠═9d8a159e-de52-4cb0-8c52-8252c447b76d
