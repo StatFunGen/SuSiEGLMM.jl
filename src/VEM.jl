@@ -140,32 +140,19 @@ function postB!(A1::Matrix{Float64}, B1::Matrix{Float64}, Sig1::Matrix{Float64},
         AB0= A0.*B0;  # #old α_l*b_l
             
         Sig1[:,:] =  1.0./(1.0./σ0'.+ ϕ) #posterior Σₗ
-        writedlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/sig1_julia.txt",Sig1)
-          #l=1
-        # Z0= y - λ.*(getXy('N',X₀,β) + getXy('N',X,sum(AB0[:,2:end],dims=2)[:,1]))
-        #         Z =  getXy('T',X,Z0)
-        #         B1[:,1] = Diagonal(Sig1[:,1])*Z #posterior bₗ
-        #        # compute α_1
-        #         # Z =  0.5*(getXy('T',X,Z0)./sqrt.(ϕ)).^2
-        #         # A0[:,1] = Π.*exp.(Z./(1.0.+ϕ/σ0[1]))./sqrt.(σ0[1]*ϕ.^(-1).+1)
-        #         A0[:,1] = log.(Π)+ 0.5*Z.^2 .*Sig1[:,1] + 0.5*log.(Sig1[:,1])
-        #         A0[:,1] = exp.(A0[:,1].-maximum(A0[:,1])) # eliminate max for numerical stability
-        #         A1[:,1]= A0[:,1]/sum(A0[:,1]) # scale to 0< α_1<1
-        #         AB1[:,1]= A1[:,1].*B1[:,1] #update α_1*b_1
-        
+    
+         
          for l= 1: L
                
                 # Z0= y - λ.*(getXy('N',X₀,β) + getXy('N',X,sum(hcat(AB1[:,1:l-1],AB0[:,l+1:end]),dims=2)[:,1]))
                 Z0= (y - λ.*(getXy('N',X₀,β) + getXy('N',X,sum(dropCol(AB0,l),dims=2)[:,1])))
                 Z =  getXy('T',X,Z0)
-                writedlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/nums-julia.txt",Z)
+             
                 B1[:,l] = Diagonal(Sig1[:,l])*Z #posterior bₗ
                   # compute α_1
                 # A1[:,l] = exp.(log.(Π)-0.5*(Z.^2)./(1.0.+ϕ./σ0[l]) +0.5*log.(σ0[l]*ϕ.^(-1).+1))
-              
-
+            
                 A1[:,l] = log.(Π)+ 0.5*Z.^2 .*Sig1[:,l] + 0.5*log.(Sig1[:,l]) 
-
                 A1[:,l] = exp.(A1[:,l].-maximum(A1[:,l])) # eliminate max for numerical stability
                 A1[:,l] = A1[:,l]/sum(A1[:,l]) # scale to 0< α_1<1
                 AB0[:,l]= A1[:,l].*B1[:,l] #update α_1*b_1
@@ -241,7 +228,6 @@ function mStep!(ξ_new::Vector{Float64},β_new::Vector{Float64},A1::Matrix{Float
 #     println(a)
 #     display(ξ_new[a])
   
-# β_new[:]= symXX('T',sqrt.(λ).*Xt₀)\getXy('T',Xt₀,(yt- λ.*(AB + ghat)))
  β_new[:]= getXX('T',X₀,'N',(λ.*X₀))\getXy('T',X₀,(y- λ.*B2))
     
 end
@@ -467,7 +453,7 @@ function emGLM(L::Int64,y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float
          #check later for performance
          crit=norm(ξ_new-ξ)+norm(β_new-β)+abs(el1-el0) +norm(B1-B0)
          
-         ξ=ξ_new;β=β_new;σ0=σ0_new;el0=el1;A0=A1;B0=B1
+         ξ=ξ_new;β=β_new;σ0=σ0_new;el0=el1;A0[:,:]=A1;B0[:,:]=B1
         
           numitr +=1
         

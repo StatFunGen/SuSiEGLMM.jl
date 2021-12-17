@@ -6,12 +6,11 @@ include("GLM.jl")
 
 
 function init(yt::Vector{Float64},Xt₀::Matrix{Float64},S::Vector{Float64};tol=1e-4)
-    n=length(yt)
-
-     τ0 = rand(1)[1]/sqrt(n); #arbitray
-    # may need to change
-    #  β = rand(c)/sqrt(c)
-    #  ξ = rand(n)/sqrt(n)
+   
+     #initialization
+    #  τ0 = rand(1)[1]/sqrt(n); #arbitray
+    τ0=0.4
+    
      β0 = glm(Xt₀,yt,Binomial()) |> coef
      ξ0 =sqrt.(getXy('N',Xt₀,β0).^2+ τ2*S)
       
@@ -79,12 +78,8 @@ function susieGLMM(L::Int64,Π::Vector{Float64},yt::Vector{Float64},Xt::Matrix{F
     # n, p = size(Xt)
     #initialization :
      σ0 = 0.1*ones(L);
-    #  τ2 = rand(1)[1]*0.001; #arbitray
-    # # may need to change
-    #  β = rand(axes(Xt₀,2))*0.0001
-    #  ξ = rand(length(yt))*0.001
-
-        result = emGLMM(L,yt,Xt,Xt₀,S,est0.τ2,est0.β,est0.ξ,σ0,Π;tol=tol)
+   
+     result = emGLMM(L,yt,Xt,Xt₀,S,est0.τ2,est0.β,est0.ξ,σ0,Π;tol=tol)
             
     return result
     
@@ -114,14 +109,17 @@ function computeT(init0::Null_est,yt::Vector{Float64},Xt₀::Matrix{Float64},Xt:
         r₀ =  2*yt.*(getXy('N',Xt₀,init0.β)+init0.μ)  
         p̂ = logistic.(r₀)
         Γ  = p̂.*(1.0.-p̂)
-        proj = ones(length(yt)) -  Xt₀*(symXX('T',sqrt.(Γ).*Xt₀)\getXy('T',Xt₀,Γ))
+        
+        proj= I - Xt₀*symXX('T',sqrt.(Γ).*Xt₀)\(Xt₀'Diagonal(Γ)) 
+        G̃ = getXX('N',proj,'N',Xt)
+    
         Tstat= zeros(p)
         
-        r=(yt-p̂)
+         ĝ = getXy('T',G̃,yt-p̂).^2
     
-           for j = p
-                ĝ = proj.*Xt[:,j]
-              Tstat[j] = (ĝ'r /sqrt.(ĝ'*(Γ.*ĝ)))^2
+         @views for j = p
+           
+              Tstat[j] = ĝ[j]/(G̃[:,j]'*(Γ.*G̃[:,j]))
            end
     
     return Tstat
@@ -200,7 +198,7 @@ end
 
 """
 
-     fineMapping_GLMM(G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},
+     fineQTL_glmm(G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},
         X₀::Union{Matrix{Float64},Vector{Float64}},
         T::Union{Array{Float64,3},Matrix{Float64}},S::Union{Matrix{Float64},Vector{Float64}};
         LOCO::Bool=true,L::Int64=10,Π::Vector{Float64}=[1/size(X,2)],tol=1e-4)
@@ -240,7 +238,7 @@ Performs SuSiE (Sum of Single Effects model) GLMM fine-mapping analysis for a bi
 
 
 """
-function fineMapping_GLMM(G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},
+function fineQTL_glmm(G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},
         X₀::Union{Matrix{Float64},Vector{Float64}},
         T::Union{Array{Float64,3},Matrix{Float64}},S::Union{Matrix{Float64},Vector{Float64}};
         LOCO::Bool=true,L::Int64=10,Π::Vector{Float64}=[1/size(X,2)],tol=1e-4)
@@ -346,7 +344,7 @@ function fineMapping(G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},X₀::Uni
        
         println("Eigen-decomposition is completed.")
         
-        est = fineMapping_GLMM(G,y,X,X₀,T,S;L=L,Π=Π,LOCO=LOCO,tol=tol)
+        est = fineQTL_glmm(G,y,X,X₀,T,S;L=L,Π=Π,LOCO=LOCO,tol=tol)
             println("SuSiEGLMM is completed.")  
         
          return est
@@ -392,4 +390,4 @@ function fineMapping1(f::Function,args...;kwargs...)
 end
 
 
-export init, initialization, fineMapping_GLMM, susieGLMM, computeT, scoreTest, GenoInfo
+export init, initialization, fineQTL_glmm, susieGLMM, computeT, scoreTest, GenoInfo
