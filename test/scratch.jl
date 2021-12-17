@@ -133,12 +133,13 @@ using UnicodePlots
 scatterplot(b_1s,b̂,xlabel= "True effects", ylabel="Posterior estimate")
 scatterplot(b_1s,α̂, xlabel="True effects",ylabel="pip")
 
-#GLMM 
-τ2=0.4; K=Matrix(1.0I,n,n)
+#GLMM :scroe test
+
 n=100; p=10; L=1; 
 b_true=zeros(p);
 B=100;
-b_1s=zeros(B); res=[];
+b_1s=zeros(B); init0=[]; Ts=zeros(p,B);
+τ2=1.2; K=Matrix(1.0I,n,n);
 
 for j = 1:B
 
@@ -150,13 +151,42 @@ for j = 1:B
     Y= logistic.(X*b_true+g) .>rand(n) #generating binary outcome
     Y=convert(Vector{Float64},Y)
     # writedlm("./testdata/dataY-julia.csv",Y)
-
-    res0= initialization(Y,X,ones(n,1),T,S;tol=1e-4)
-    res=[res;res0]
+    T, S = svdK(K;LOCO=false)
+    Xt, Xt₀, yt,init00= initialization(Y,X,ones(n,1),T,S;tol=1e-4)
+    T0= computeT(init00,yt,Xt₀,Xt)
+    init0=[init0;init00]
+    Ts[:,j]=T0
 end
 
-b̂ = [res[j].α[1]*res[j].ν[1] for j=1:B]
-α̂ = [res[j].α[1] for j=1:B]
+[init0[j].τ2 for j=1:B]
+
+#susie-GLMM
+
+n=100; p=10; L=1; 
+b_true=zeros(p);
+B=100;
+b_1s=zeros(B); res1=[];
+τ2=1.2; K=Matrix(1.0I,n,n);
+
+for j = 1:B
+
+    b_true[1]= randn(1)[1] 
+    b_1s[j] = b_true[1]
+    X=randn(n,p)
+    g=rand(MvNormal(τ2*K))
+    # writedlm("./testdata/dataX-julia.csv",X)
+    Y= logistic.(X*b_true+g) .>rand(n) #generating binary outcome
+    Y=convert(Vector{Float64},Y)
+    # writedlm("./testdata/dataY-julia.csv",Y)
+    T, S = svdK(K;LOCO=false)
+    Xt, Xt₀, yt, init0 = initialization(Y,X,ones(n,1),T,S;tol=1e-4) 
+    res10 = susieGLMM(L,ones(p)/p,yt,Xt,Xt₀,S,init0;tol=1e-4)
+    res1=[res1;res10]
+end
+
+
+b̂ = [res1[j].α[1]*res1[j].ν[1] for j=1:B]
+α̂ = [res1[j].α[1] for j=1:B]
 
 
 using UnicodePlots
