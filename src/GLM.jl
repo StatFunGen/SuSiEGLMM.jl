@@ -1,6 +1,6 @@
 
 
-export susieGLM
+export susieGLM, fineQTL_glm
 using GLM
 
 function susieGLM(L::Int64,Π::Vector{Float64},y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float64};tol=1e-5)
@@ -30,7 +30,7 @@ return result
 end 
 
 
-function fineMapping_GLM(G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},
+function fineQTL_glm(G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},
     X₀::Union{Matrix{Float64},Vector{Float64}};L::Int64=10,Π::Vector{Float64}=[1/size(X,2)],tol=1e-5)
 
     Chr=sort(unique(G.chr));
