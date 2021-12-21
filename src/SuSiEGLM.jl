@@ -3,7 +3,7 @@
 export susieGLM, fineQTL_glm
 using GLM
 
-function susieGLM(L::Int64,Π::Vector{Float64},y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float64};tol=1e-5)
+function susieGLM(L::Int64,Π::Vector{Float64},y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float64},Vector{Float64}};tol=1e-4)
   
     n =size(X₀,1)
     y1= zeros(n)
@@ -14,7 +14,7 @@ function susieGLM(L::Int64,Π::Vector{Float64},y::Vector{Float64},X::Matrix{Floa
          
     y1 =y.-0.5 # centered y
 #initialization :
- σ0 = 0.1*ones(L);
+ σ0 = ones(L);
 #  β = rand(c)/sqrt(c)
 #  ξ = rand(n)/sqrt(n)
  
@@ -31,7 +31,7 @@ end
 
 
 function fineQTL_glm(G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},
-    X₀::Union{Matrix{Float64},Vector{Float64}};L::Int64=10,Π::Vector{Float64}=[1/size(X,2)],tol=1e-5)
+    X₀::Union{Matrix{Float64},Vector{Float64}}=ones(length(y),1);L::Int64=10,Π::Vector{Float64}=[1/size(X,2)],tol=1e-4)
 
     Chr=sort(unique(G.chr));
     est= @distributed (vcat) for j= eachindex(Chr)
@@ -39,14 +39,14 @@ function fineQTL_glm(G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},
                   #check size of Π
                   if (Π==[1/size(X,2)]) #default value
                     m=length(midx)
-                    Π1 =repeat(1/m,m) #adjusting πⱼ
+                    Π1 =ones(m)/m #adjusting πⱼ
                    elseif (length(Π)!= size(X,2))
                       println("Error. The length of Π should match $(size(X,2)) SNPs!")
                    else
                     Π1 = Π[midx]
                  end
 
-                 est0= susieGLM(L,Π1,y,X,X₀;tol=tol)
+                 est0= susieGLM(L,Π1,y,X[:,midx],X₀;tol=tol)
                         est0
     end
 
