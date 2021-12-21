@@ -126,24 +126,32 @@ scatterplot(b_1s,α̂, xlabel="True effects",ylabel="pip")
 
 #GLMM :scroe test
 
-n=100; p=10; L=1; 
-b_true=zeros(p);
-B=100;
-b_1s=zeros(B); init0=[]; Ts=zeros(p,B);
-τ2=1.2; K=Matrix(1.0I,n,n);
+# n=100; p=10; L=1; 
+p=2000;
+B=100;τ2=1.2; #K=Matrix(1.0I,n,n);
+K2=Symmetric(K)
+b_true=zeros(p);b_1s=zeros(B); init0=[]; Ts=zeros(p,B);
 
+
+# F =cholesky(K2)
+# f = svd(F.U)
+# T,S = f.Vt, f.S.^2
+T,S = svdK(K;LOCO=false)
+# H=svd(K2);
 for j = 1:B
 
     b_true[1]= randn(1)[1] 
     b_1s[j] = b_true[1]
-    X=randn(n,p)
-    g=rand(MvNormal(τ2*K))
+    # X=randn(n,p)
+    X1=X[:,1:p]
+
+    g=rand(MvNormal(τ2*K2))
     # writedlm("./testdata/dataX-julia.csv",X)
-    Y= logistic.(X*b_true+g) .>rand(n) #generating binary outcome
+    Y= logistic.(X1*b_true+g) .>rand(n) #generating binary outcome
     Y=convert(Vector{Float64},Y)
     # writedlm("./testdata/dataY-julia.csv",Y)
-    T, S = svdK(K;LOCO=false)
-    Xt, Xt₀, yt,init00= initialization(Y,X,ones(n,1),T,S;tol=1e-4)
+    
+    Xt, Xt₀, yt,init00= initialization(Y,X1,ones(n,1),T,S;tol=1e-4)
     T0= computeT(init00,yt,Xt₀,Xt)
     init0=[init0;init00]
     Ts[:,j]=T0
@@ -163,15 +171,17 @@ for j = 1:B
 
     b_true[1]= randn(1)[1] 
     b_1s[j] = b_true[1]
-    X=randn(n,p)
-    g=rand(MvNormal(τ2*K))
+    # X=randn(n,p)
+    X1=X[:,1:p]
+    g=rand(MvNormal(τ2*K2))
     # writedlm("./testdata/dataX-julia.csv",X)
-    Y= logistic.(X*b_true+g) .>rand(n) #generating binary outcome
+    Y= logistic.(X1*b_true+g) .>rand(n) #generating binary outcome
     Y=convert(Vector{Float64},Y)
     # writedlm("./testdata/dataY-julia.csv",Y)
-    T, S = svdK(K;LOCO=false)
-    Xt, Xt₀, yt, init0 = initialization(Y,X,ones(n,1),T,S;tol=1e-4) 
-    res10 = susieGLMM(L,ones(p)/p,yt,Xt,Xt₀,S,init0;tol=1e-4)
+    # T, S = svdK(K;LOCO=false)
+    # Xt, Xt₀, yt, init0 = initialization(Y,X,ones(n,1),T,S;tol=1e-4)     
+    # res10 = susieGLMM(L,ones(p)/p,yt,Xt,Xt₀,S,init0;tol=1e-4)
+    @time res10 =susieGLMM(1,ones(p)/p,Y,X1,ones(n,1),T,S) 
     res1=[res1;res10]
 end
 
