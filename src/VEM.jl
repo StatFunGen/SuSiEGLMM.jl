@@ -349,9 +349,9 @@ function emGLMM(L::Int64,yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{F
         
          el1=ELBO(L,ξ_new,β_new,σ0_new,τ2_new,A1,B1,AB2,Sig1,Π,ghat2,Vg,S,yt,Xt,Xt₀)
      
-         # crit=el1-el0 
+         crit=abs(el1-el0)
          #check later for performance
-         crit=norm(ξ_new-ξ)+norm(β_new-β)+abs(τ2_new-τ2)+abs(el1-el0)+norm(B1-B0)
+        #  crit=norm(ξ_new-ξ)+norm(β_new-β)+abs(τ2_new-τ2)+abs(el1-el0)+norm(B1-B0)
          
          ξ=ξ_new;β=β_new;σ0=σ0_new; τ2=τ2_new;el0=el1;A0[:,:]=A1;B0[:,:]=B1
         
@@ -398,8 +398,8 @@ function emGLMM(yt,Xt₀,S,τ2,β,ξ;tol::Float64=1e-4)
         
          el1=ELBO(ξ_new,β_new,τ2_new,ghat2,Vg,S,yt,Xt₀)
      
-         # crit=el1-el0 
-         crit=norm(ξ_new-ξ)+norm(β_new-β)+abs(τ2_new-τ2)+abs(el1-el0)  
+         crit=abs(el1-el0)
+        #  crit=norm(ξ_new-ξ)+norm(β_new-β)+abs(τ2_new-τ2)+abs(el1-el0)  
         
          ξ=ξ_new;β=β_new; τ2=τ2_new;el0=el1
         
@@ -462,9 +462,9 @@ function emGLM(L::Int64,y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float
          el1=ELBO(L,ξ_new,β_new,σ0_new,A1,B1,AB2,Sig1,Π,y,X,X₀)
         #  println("elbo = $(el1)")
      
-        #  crit=el1-el0 
+         crit=abs(el1-el0)
          #check later for performance
-         crit=norm(ξ_new-ξ)+norm(β_new-β)+abs(el1-el0) +norm(B1-B0)
+        #  crit=norm(ξ_new-ξ)+norm(β_new-β)+abs(el1-el0) +norm(B1-B0)
          
          ξ=ξ_new;β=β_new;σ0=σ0_new;el0=el1;A0[:,:]=A1;B0[:,:]=B1
         

@@ -1,40 +1,43 @@
 #code debugging
 
-using Statistics, Distributions, StatsBase, Random, LinearAlgebra, DelimitedFiles, Distributed
 
-#include("./SuSiEGLMM.jl")
-#using .SuSiEGLMM
+@everywhere using Statistics, Distributions, StatsBase, Random, LinearAlgebra, DelimitedFiles, Distributed
 
-# include("GIT/SuSiEGLMM.jl/src/GLMM.jl")
+@everywhere using Revise
+@everywhere using Pkg
+@everywhere Pkg.activate(homedir()*"/GIT/SuSiEGLMM.jl")
+@everywhere using SuSiEGLMM
 
-info=readdlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/snp_info.bim")
-data=readdlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/pop_518ids_4000snps.txt";header=true); #518 x 4000 snps (qtl = 1927th)
+@time info=readdlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/causal1/pop/ascertained_pop_12_10.bim");
+@time geno=readdlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/causal1/pop/ascertained_pop_genotype_12_10.txt";header=true);
+@time pheno=readdlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/causal1/pop/ascertained_pop_phenotype_12_10.txt";header=true); #518 x 4000 snps (qtl = 1927th)
 #data1=readdlm("../testdata/fam_100fams_4000snps.txt";header=true)
 
-#5th col :sex
-Covar = convert(Vector{Float64},data[1][:,5])
-Covar[Covar.==1].=0.0
-Covar[Covar.==2].=1.0
+# covariate: sex
+C = pheno[1][:,end-1]
+C[C.==1].=0.0
+C[C.==2].=1.0
 
 #last col: trait
-y=convert(Vector{Float64},data[1][:,end])
+# y=convert(Vector{Float64},data[1][:,end])
+y=pheno[1][:,end]
 
 # kinship
-K=readdlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/pop_518fams_4000snps.cXX.txt") #518
+K=readdlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/causal1/pop/pop_grm.txt") #518
 # K_fam=readdlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/fam_100fams_4000snps.cXX.txt")
+ n=size(K,1)
+K1=zeros(n,n,2);
+K1[:,:,1]=K; K1[:,:,2]=K;
 
 
-info1= [info[1:20,:];info[1925:1929,:]]
-using Revise
-using Pkg
-Pkg.activate(homedir()*"/GIT/SuSiEGLMM.jl")
-using SuSiEGLMM
-G= GenoInfo(info1[:,2],info1[:,1],info1[:,3])
+
+
+G= GenoInfo(info[:,2],info[:,1],info[:,3])
 
 
 
 # fill out "NA" 
-X = [data[1][:,6:25] data[1][:,1930:1934]]
+X = geno[1][:,6:end]
 
 for j =axes(X,2)
     idx = findall(X[:,j].=="NA")
@@ -42,41 +45,41 @@ for j =axes(X,2)
     X[idx,j] .= mean(skipmissing(X[:,j]))
 end
 
-for j =axes(X,2)
+# for j =axes(X,2)
     
-   println(sum(ismissing.(X[:,j])))
+#    println(sum(ismissing.(X[:,j])))
     
-end
+# end
 
 X = convert(Matrix{Float64},X)
 n,p = size(X)
-L=3; Π = ones(p)/p
+# L=3; Π = ones(p)/p
+#score test
+@time Tstat, pval= SuSiEGLMM.scoreTest(K,G,y,X;LOCO=false);
 
-# write small data for debugging in VS-code
-# writedlm("./test/smalldataX_covar_y.txt",[X[1:15,11:25] Covar[1:15] y[1:15]])
-# writedlm("./test/testinfo.txt",info[11:25,:])
-# writedlm("./test/testinfo_loco.txt",[info[11:17,:];info[end-7:end,:]])
-# writedlm("./test/testK.txt",K[1:15,1:15])
-
-# @time est1= fineMapping_GLMM(G,y,X,Covar,T1[:,:,1],S1[:,1];LOCO=false,tol=1e-4)
+    T, S = svdK(K;LOCO=false)
+    Xt, Xt₀, yt,init00= initialization(y,X,ones(n,1),T,S;tol=1e-4)
+    T0= computeT(init00,yt,Xt₀,Xt)
 
 
-fineMapping_GLMM(G,y,X,Covar,F.U,F.S;LOCO=false,tol=1e-4)    
-@time est2= fineMapping_GLMM(G1,y,X1,Covar,F.U,F.S;LOCO=false, tol=1e-5)
+@time Tstat1, pval1= SuSiEGLMM.scoreTest(K,G,y,X,C;LOCO=false)
 
+@time Tstat2, pval2= SuSiEGLMM.scoreTest(K1,G,y,X)
+@time Tstat3, pval3= SuSiEGLMM.scoreTest(K1,G,y,X,C)
 
-for j=axes(K,1)
-    K[j,j]=1.0
-end
+#susie-glm
+@time est0= fineQTL_glm(G,y,X;tol=1e-4)
+@time est1= fineQTL_glm(G,y,X,C;tol=1e-4)
 
+#susie-glmm: verion 1
+@time est2 = fineQTL_glmm(G,y,X,ones(n,1),T,S;LOCO=false)
+T1, S1= svdK(K1)
+@time est3 = fineQTL_glmm(G,y,X,ones(n,1),T1,S1;LOCO=true)
+#susie-glmm: version 2
 
+@time est4 =fineQTL_glmm(K,G,y,X;LOCO=false,tol=1e-4)
 
-
-Xt, Ct, yt = rotate(y,X,Covar,T) 
-@time res0=susieGLMM(L,Π,yt,Xt,Ct,S;tol=1e-4)
-@time res=susieGLMM(L,Π,yt,Xt,Ct,S;tol=1e-5)
-@time res2=susieGLMM(L,Π,yt,Xt,Ct,S;tol=1e-6)
-
+@time est5 =fineQTL_glmm(K1,G,y,X;tol=1e-4)
 
 
 # K=I
@@ -90,18 +93,6 @@ p=size(X,2)
 [[1.0.-prod(1.0.-est1.α[j,:]) for j =1:p] [1.0.-prod(1.0.-res.α[j,:]) for j =1:p]]
 [1.0.-prod(1.0.-res.α[j,:]) for j =1:p]
     
-#########
-X1 = data[1][:,6:end-1]
- X1[X1.=="NA"].= missing
-for j =axes(X1,2)
-    idx =findall(ismissing.(X1[:,j]))
-   X1[idx,j] .= mean(skipmissing(X1[:,j]))
-end
-
-X1 = convert(Array{Float64,2},X1)
-
-n,p=size(X1)
-G1=GenoInfo(info[:,2],info[:,1],info[:,3])
 
 
 ######## the same simulation in R-version

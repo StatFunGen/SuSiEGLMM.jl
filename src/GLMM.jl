@@ -2,7 +2,7 @@
 
 include("Utilities.jl")
 include("VEM.jl")
-include("GLM.jl")
+include("SuSiEGLM.jl")
 
 
 function init(yt::Vector{Float64},Xt₀::Matrix{Float64},S::Vector{Float64},β::Vector{Float64},ξ::Vector{Float64},τ²::Float64;tol=1e-4)
@@ -53,7 +53,7 @@ function initialization(y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix
         n=length(y)
     # check if covariates are added as input and include the intercept. 
     if(X₀!= ones(n,1)) #&&(size(X₀,2)>1)
-        X₀ = hcat(ones(length(y)),X₀)
+        X₀ = hcat(ones(n),X₀)
     end
     
         
@@ -61,11 +61,11 @@ function initialization(y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix
 #                    Xt₀ = rotateX(X₀,T)
 #                    yt = rotateY(y,T)
      Xt, Xt₀, yt = rotate(y,X,X₀,T)   
-     y0= getXy('N',T,y) # rotate w/o centering for β0
+    #  y0= getXy('N',T,y) # rotate w/o centering for β0
     #initialization
      τ0 = rand(1)[1]; #arbitray
-    # τ0=0.4    
-    β0 = glm(Xt₀,y0,Binomial()) |> coef
+    # τ0=1.2   
+    β0 = glm(X₀,y,Binomial()) |> coef
     ξ0 =sqrt.(getXy('N',Xt₀,β0).^2+ τ0*S)
 
     init_est= init(yt,Xt₀,S,β0,ξ0,τ0;tol=tol)
@@ -74,13 +74,14 @@ function initialization(y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix
 end
 
 
-# X₀: check if it includes intercept
+# version 1
 function susieGLMM(L::Int64,Π::Vector{Float64},yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{Float64},
         S::Vector{Float64},est0::Null_est;tol=1e-4)
     
     # n, p = size(Xt)
     #initialization :
      σ0 = 0.1*ones(L);
+
    
      result = emGLMM(L,yt,Xt,Xt₀,S,est0.τ2,est0.β,est0.ξ,σ0,Π;tol=tol)
             
@@ -88,12 +89,37 @@ function susieGLMM(L::Int64,Π::Vector{Float64},yt::Vector{Float64},Xt::Matrix{F
     
 end 
 
+# version 2
+function susieGLMM(L::Int64,Π::Vector{Float64},y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float64},T::Matrix{Float64},
+    S::Vector{Float64};tol=1e-4)
+
+
+     
+# check if covariates are added as input and include the intercept. 
+     n=length(y) 
+        if(X₀!= ones(n,1)) #&&(size(X₀,2)>1)
+            X₀ = hcat(ones(n),X₀)
+        end
+
+    Xt, Xt₀, yt = rotate(y,X,X₀,T)   
+    #initialization :
+    σ0 = 0.1*ones(L); τ0 = rand(1)[1]; #arbitray
+    β0 = glm(X₀,y,Binomial()) |> coef 
+    ν0 =sum(repeat(Π,outer=(1,L)).*σ0',dims=2)[:,1] ; #ν²0
+    ξ0 =sqrt.(getXy('N',Xt.^2.0,ν0)+ getXy('N',Xt₀,β0).^2+ τ0*S )
+ 
+
+    result = emGLMM(L,yt,Xt,Xt₀,S,τ0,β0,ξ0,σ0,Π;tol=tol)
+        
+return result
+
+end 
 
 
 # compute score test statistic : need to check again
 function computeT(init0::Null_est,yt::Vector{Float64},Xt₀::Matrix{Float64},Xt::Matrix{Float64})
     
-        p=axes(Xt,2)
+        m=axes(Xt,2)
         r₀ =  2*yt.*(getXy('N',Xt₀,init0.β)+init0.μ)  
         p̂ = logistic.(r₀)
         Γ  = p̂.*(1.0.-p̂)
@@ -101,11 +127,11 @@ function computeT(init0::Null_est,yt::Vector{Float64},Xt₀::Matrix{Float64},Xt:
         proj= I - Xt₀*(symXX('T',sqrt.(Γ).*Xt₀)\(Xt₀'Diagonal(Γ)))
         G̃ = getXX('N',proj,'N',Xt)
     
-        Tstat= zeros(p)
+        Tstat= zeros(m)
         
          ĝ = getXy('T',G̃,yt-p̂).^2
     
-         @views for j = p
+           for j = m
            
               Tstat[j] = ĝ[j]/(G̃[:,j]'*(Γ.*G̃[:,j]))
            end
@@ -118,18 +144,19 @@ end
 
 """
 
-    scoreTest(G::GenoInfo,y::Vector{Float64},X₀::Union{Matrix{Float64},Vector{Float64}},X::Matrix{Float64},
-        K::Union{Array{Float64,3},Matrix{Float64}};LOCO::Bool=true,tol=1e-4)
+    scoreTest(K::Union{Array{Float64,3},Matrix{Float64}},G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},
+    X₀::Union{Matrix{Float64},Vector{Float64}}=ones(length(y),1);LOCO::Bool=true,tol=1e-4)
 
 Returns 1-df score test statistic for case-control association tests that follows Chi-square distribution, `T²∼Χ²₍₁₎` under `H₀: β=0`.
 
 # Arguments
 
+
+- `K` : a 3d-array of a symmetric positive definite kinship, `size(K) = (n,n, # of Chromosomes)` if `LOCO = true` (default).  Or a n x n matrix if false.
 - `G` : a Type of struct, `GenoInfo`. See [`GenoInfo`](@ref).
 - `y` : a n x 1 vector of  binary trait
-- `X₀`: a n x c matrix of covariates.  The intercept is default if no covariates is added.
 - `X` : a n x p matrix of genetic markers (SNPs)
-- `K` : a 3d-array of a symmetric positive definite kinship, `size(K) = (n,n, # of Chromosomes)` if `LOCO = true` (default).  Or a n x n matrix if false.
+- `X₀`: a n x c matrix of covariates.  The intercept is default if no covariates is added.
 
 ## Keyword Arguments
 
@@ -139,20 +166,20 @@ Returns 1-df score test statistic for case-control association tests that follow
 # Output
 
 - `T_stat` : a p x 1 vector of test statistics for case-control association tests.  The  test statistic is computed based on [reginie](https://www.nature.com/articles/s41588-021-00870-7).
+- `p_value`: a p x 1 vector of the corresponding p-values (by Chi^2 with 1 df) for case-control association tests.  
 
 """
-function scoreTest(G::GenoInfo,y::Vector{Float64},X₀::Union{Matrix{Float64},Vector{Float64}},X::Matrix{Float64},
-        K::Union{Array{Float64,3},Matrix{Float64}};LOCO::Bool=true,tol=1e-4)
+function scoreTest(K::Union{Array{Float64,3},Matrix{Float64}},G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float64},Vector{Float64}}=ones(length(y),1)
+        ;LOCO::Bool=true,tol=1e-4)
     
+        Chr=sort(unique(G.chr));
+        T, S = svdK(K;LOCO=LOCO)
+        # println("Eigen-decomposition is completed.")
+
     
     if (LOCO)
 
-        Chr=sort(unique(G.chr));
-
-        # T, S = eigenK(K;LOCO=LOCO,δ=0.001)
-        T, S = svdK(K;LOCO=LOCO)
-        println("Eigen-decomposition is completed.")
-
+    
         # T_stat=zeros(size(X,2))
 
          T_stat = @distributed (vcat) for j= eachindex(Chr)
@@ -165,17 +192,17 @@ function scoreTest(G::GenoInfo,y::Vector{Float64},X₀::Union{Matrix{Float64},Ve
 
     else #no loco
 
+        Xt, Xt₀, yt, init0 = initialization(y,X,X₀,T,S;tol=tol) 
          
-        #  T, S = eigenK(K;LOCO=LOCO,δ=0.001)
-         T, S = svdK(K;LOCO=LOCO)
-         println("Eigen-decomposition is completed.")
-
-         Xt, Xt₀, yt, init0 = initialization(y,X,X₀,T,S;tol=tol) 
-         T_stat = computeT(init0,yt,Xt₀,Xt)
+        T_stat = @distributed (vcat) for j= eachindex(Chr)
+            midx= findall(G.chr.== Chr[j])
+            tstat = computeT(init0,yt,Xt₀,Xt[:,midx])
+            tstat
+         end
         
     end
     
-    p_value = ccdf.(Chisq(1),T_stat) #check
+    p_value = ccdf.(Chisq(1),T_stat) #check later for parallelization
 
     return T_stat, p_value
 end
@@ -231,10 +258,10 @@ function fineQTL_glmm(G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},
         T::Union{Array{Float64,3},Matrix{Float64}},S::Union{Matrix{Float64},Vector{Float64}};
         LOCO::Bool=true,L::Int64=10,Π::Vector{Float64}=[1/size(X,2)],tol=1e-4)
     
-    
+        Chr=sort(unique(G.chr));
     
      if(LOCO)     
-             Chr=sort(unique(G.chr));
+             
    est= @distributed (vcat) for j= eachindex(Chr)
                 midx= findall(G.chr.== Chr[j])
                 Xt, Xt₀, yt, init0 = initialization(y,X[:,midx],X₀,T[:,:,j],S[:,j];tol=tol)
@@ -255,15 +282,23 @@ function fineQTL_glmm(G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},
            
     else #no loco for one genomic region
             
-            
-                  if(length(Π)==1)
-                     Π =repeat(Π,size(X,2))
+            est = @distributed (vcat) for j= eachindex(Chr)
+               midx= findall(G.chr.== Chr[j])
+                 
+               # check prior probabilities
+                 if (Π==[1/size(X,2)])
+                    m=length(midx)
+                    Π1 =ones(m)/m 
                   elseif (length(Π)!= size(X,2))
                     println("Error. The length of Π should match $(size(X,2)) SNPs!")
-                  end
+                   else
+                    Π1 = Π[midx]
+                 end
                  
-                 Xt, Xt₀, yt, init0 = initialization(y,X,X₀,T,S;tol=tol) 
-                 est = susieGLMM(L,Π,yt,Xt,Xt₀,S,init0;tol=tol)
+                 Xt, Xt₀, yt, init0 = initialization(y,X[:,midx],X₀,T,S;tol=tol)
+                 est0 = susieGLMM(L,Π1,yt,Xt,Xt₀,S,init0;tol=tol)
+                 est0
+            end
                      
                            
             
@@ -275,6 +310,62 @@ function fineQTL_glmm(G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},
 end
 
 
+#version 2
+function fineQTL_glmm(K::Union{Array{Float64,3},Matrix{Float64}},G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},
+    X₀::Union{Matrix{Float64},Vector{Float64}}=ones(length(y),1);
+    LOCO::Bool=true,L::Int64=10,Π::Vector{Float64}=[1/size(X,2)],tol=1e-4)
+
+    Chr=sort(unique(G.chr));
+    T, S = svdK(K;LOCO=LOCO)
+
+ if(LOCO)     
+         
+     est= @distributed (vcat) for j= eachindex(Chr)
+            midx= findall(G.chr.== Chr[j])
+            
+                       #check size of Π
+                       
+                      if (Π==[1/size(X,2)]) #default value
+                          m=length(midx)
+                          Π1 =ones(m)/m #adjusting πⱼ
+                         elseif (length(Π)!= size(X,2))
+                            println("Error. The length of Π should match $(size(X,2)) SNPs!")
+                         else
+                          Π1 = Π[midx]
+                       end
+                 
+            est0= susieGLMM(L,Π1,y,X[:,midx],X₀,T[:,:,j],S[:,j];tol=tol)                  
+            est0
+     end
+       
+else #no loco 
+        
+        est = @distributed (vcat) for j= eachindex(Chr)
+           midx= findall(G.chr.== Chr[j])
+             
+           # check prior probabilities
+             if (Π==[1/size(X,2)])
+                m=length(midx)
+                Π1 =ones(m)/m 
+              elseif (length(Π)!= size(X,2))
+                println("Error. The length of Π should match $(size(X,2)) SNPs!")
+               else
+                Π1 = Π[midx]
+             end
+             
+            
+             est0 = susieGLMM(L,Π1,y,X[:,midx],X₀,T,S;tol=tol) 
+             est0
+        end
+                 
+                       
+        
+end # loco
+
+
+return est
+
+end
 
 function randomizeData!(y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float64},
     T::Array{Float64,3},S::Matrix{Float64})
@@ -322,7 +413,7 @@ end
 
 function fineMapping(G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float64},Vector{Float64}}=ones(length(y),1);
         K::Union{Array{Float64,3},Matrix{Float64}}=Matrix(1.0I,1,1),L::Int64=10,Π::Vector{Float64}=[1/size(X,2)],LOCO::Bool=true,
-        model=["susieglmm","susie","mvsusie"],tol=1e-4)
+        model=["susieglmm","susieglm","susie","mvsusie"],tol=1e-4)
     
     #need to work more   
     
@@ -335,18 +426,17 @@ function fineMapping(G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},X₀::Uni
         est = fineQTL_glmm(G,y,X,X₀,T,S;L=L,Π=Π,LOCO=LOCO,tol=tol)
             println("SuSiEGLMM is completed.")  
         
-         return est
         
-        
-    elseif(model="susie")
-        
-        
+    elseif(model=="susieglm")
+        est = fineQTL_glm(G,y,X,X₀,L=L,Π=Π,tol=tol)
+           
     else #model=mvsusie
         
-        
+        println("it is not ready yet.")
         
     end #model
         
+    return est
 end
         
     
