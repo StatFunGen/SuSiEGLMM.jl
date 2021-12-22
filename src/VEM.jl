@@ -232,7 +232,7 @@ end
 
 # for a full model
 function ELBO(L::Int64,ξ_new::Vector{Float64},β_new::Vector{Float64},σ0_new::Vector{Float64},τ2_new::Float64,
-        A1::Matrix{Float64},B1::Matrix{Float64},AB2::Matrix{Float64},Sig1::Matrix{Float64},Π::Vector{Float64},
+        A1::Matrix{Float64},B1::Matrix{Float64},AB2::Matrix{Float64},Sig1::Matrix{Float64},Π::Vector{Float64},ghat::Vector{Float64},
         ghat2::Vector{Float64},Vg::Vector{Float64},S::Vector{Float64},yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{Float64})
 
     n=length(yt); p = size(B1,1); lnb =zeros(L);
@@ -347,7 +347,7 @@ function emGLMM(L::Int64,yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{F
          
          mStep!(ξ_new,β_new,A1,B1,AB2,ghat,ghat2,λ,yt,Xt,Xt₀,β,L)
         
-         el1=ELBO(L,ξ_new,β_new,σ0_new,τ2_new,A1,B1,AB2,Sig1,Π,ghat2,Vg,S,yt,Xt,Xt₀)
+         el1=ELBO(L,ξ_new,β_new,σ0_new,τ2_new,A1,B1,AB2,Sig1,Π,ghat,ghat2,Vg,S,yt,Xt,Xt₀)
      
          crit=abs(el1-el0)
          #check later for performance
