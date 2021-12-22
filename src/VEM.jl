@@ -239,7 +239,7 @@ function ELBO(L::Int64,ξ_new::Vector{Float64},β_new::Vector{Float64},σ0_new::
     
 
     AB1=getXy('N',Xt,sum(A1.*B1,dims=2)[:,1])
-     elbo0= ELBO(ξ_new,β_new,τ2_new,ghat2,Vg,AB1,S,yt,Xt₀)#null part
+     elbo0= ELBO(ξ_new,β_new,τ2_new,ghat,ghat2,Vg,AB1,S,yt,Xt₀)#null part
      # susie part
     for l= 1: L 
         if(sum(A1[:,l].==0.0)>0) #avoid NaN by log(0)
@@ -258,11 +258,11 @@ function ELBO(L::Int64,ξ_new::Vector{Float64},β_new::Vector{Float64},σ0_new::
 end
     
 # For initial values : H0 w/o susie
-function ELBO(ξ_new::Vector{Float64},β_new::Vector{Float64},τ2_new::Float64,
+function ELBO(ξ_new::Vector{Float64},β_new::Vector{Float64},τ2_new::Float64,ghat::Vector{Float64},
         ghat2::Vector{Float64},Vg::Vector{Float64},S::Vector{Float64},yt::Vector{Float64},Xt₀::Matrix{Float64})
    
     n=length(yt);
-    ll= sum(log.(logistic.(ξ_new))- 0.5*ξ_new)+ yt'*getXy('N',Xt₀,β_new) #lik
+    ll= sum(log.(logistic.(ξ_new))- 0.5*ξ_new)+ yt'*(getXy('N',Xt₀,β_new)+ghat) #lik
     gl = -0.5*(n*log(τ2_new)+ sum(log.(S)-log.(Vg))- 1.0) - sum(ghat2./S)/τ2_new # g
     
     return ll+gl
@@ -270,11 +270,11 @@ function ELBO(ξ_new::Vector{Float64},β_new::Vector{Float64},τ2_new::Float64,
 end
 
 # for H0 with susie 
-function ELBO(ξ_new::Vector{Float64},β_new::Vector{Float64},τ2_new::Float64,
+function ELBO(ξ_new::Vector{Float64},β_new::Vector{Float64},τ2_new::Float64,ghat::Vector{Float64},
     ghat2::Vector{Float64},Vg::Vector{Float64},AB1::Vector{Float64},S::Vector{Float64},yt::Vector{Float64},Xt₀::Matrix{Float64})
 
 n=length(yt);
-ll= sum(log.(logistic.(ξ_new))- 0.5*ξ_new)+ yt'*(getXy('N',Xt₀,β_new) + AB1) #lik
+ll= sum(log.(logistic.(ξ_new))- 0.5*ξ_new)+ yt'*(getXy('N',Xt₀,β_new) + AB1 + ghat) #lik
 gl = -0.5*(n*log(τ2_new)+ sum(log.(S)-log.(Vg))- 1.0) - sum(ghat2./S)/τ2_new # g
 
 return ll+gl
@@ -396,7 +396,7 @@ function emGLMM(yt,Xt₀,S,τ2,β,ξ;tol::Float64=1e-4)
          
          mStep!(ξ_new,β_new,ghat,ghat2,λ,yt,Xt₀,β)
         
-         el1=ELBO(ξ_new,β_new,τ2_new,ghat2,Vg,S,yt,Xt₀)
+         el1=ELBO(ξ_new,β_new,τ2_new,ghat,ghat2,Vg,S,yt,Xt₀)
      
          crit=abs(el1-el0)
         #  crit=norm(ξ_new-ξ)+norm(β_new-β)+abs(τ2_new-τ2)+abs(el1-el0)  
