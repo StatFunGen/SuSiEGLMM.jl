@@ -97,7 +97,7 @@ p=size(X,2)
 Seed(124)
 
 
- L=1; B=100;τ2=1.2;
+ L=1; B=100;τ2=0.4;
 #GLM
 b_true=zeros(p);
 b_1s=zeros(B);
@@ -108,19 +108,19 @@ for j = 1:B
     b_true[1]= randn(1)[1] 
     b_1s[j] = b_true[1]
     # X=randn(n,p)
-     
-    Y= logistic.(X*b_true) .>rand(n) #generating binary outcome
+    g=rand(MvNormal(τ2*K0)) 
+    Y= logistic.(X*b_true+g) .>rand(n) #generating binary outcome
     Y=convert(Vector{Float64},Y)
     # writedlm("./testdata/dataY-julia.csv",Y)
     # res0= susieGLM(L, ones(p)/p,Y,X,ones(n,1);tol=1e-4) 
-  t0=@elapsed  res0= fineQTL_glm(G,Y,X;tol=1e-4)
+  t0=@elapsed  res0= fineQTL_glm(G,Y,X;L=L,tol=1e-4)
     res=[res;res0]; Tm[j]=t0
 end
 
-b̂ = [res[j].α[1]*res[j].ν[1] for j=1:B]
-α̂ = [res[j].α[1] for j=1:B]
+b̂ = [res[2j-1].α[1]*res[2j-1].ν[1] for j=1:B]
+α̂ = [res[2j-1].α[1] for j=1:B]
 writedlm("./test/glm-cau1.txt",[b̂ α̂ b_1s])
-println("mediantime for glm is $(median(Tm)).")
+println("min median max times for glm are $(minimum(Tm)),$(median(Tm)), $(maximum(Tm)).")
 
 using UnicodePlots
 scatterplot(b_1s,b̂,xlabel= "True effects", ylabel="Posterior estimate")
@@ -133,12 +133,13 @@ scatterplot(b_1s,α̂, xlabel="True effects",ylabel="pip")
 # K2=Symmetric(K0)
 b_true=zeros(p);
 # b_1s=zeros(B); init0=[]; 
-Ps=zeros(p,B); Tscore=zeros(B)
+Ps=zeros(p,B); Tscore=zeros(B);
 
 
 # F =cholesky(K2)
 # f = svd(F.U)
 # T,S = f.Vt, f.S.^2
+K0=convert(Matrix{Float64},K0);
 T,S = svdK(K0;LOCO=false)
 # H=svd(K2);
 for j = 1:B
@@ -147,7 +148,7 @@ for j = 1:B
     # b_1s[j] = b_true[1]
     b_true[1]=b_1s[j]
     # X=randn(n,p)
-    g=rand(MvNormal(τ2*K0))
+    g=rand(MvNormal(τ2*K))
     # writedlm("./testdata/dataX-julia.csv",X)
     Y= logistic.(X*b_true+g) .>rand(n) #generating binary outcome
     Y=convert(Vector{Float64},Y)
@@ -157,12 +158,12 @@ for j = 1:B
     # T0= computeT(init00,yt,Xt₀,Xt)
     # init0=[init0;init00]
     # Ts[:,j]=T0
-   t0= @elapsed Ts,P0= scoreTest(K0,G,Y,X;LOCO=false);
+   t0= @elapsed Ts,P0= scoreTest(K,G,Y,X;LOCO=false);
    Ps[:,j]=P0; Tscore[j]=t0
 end
 
 writedlm("./test/glmm-scoretest.txt",Ps)
-println("median time for score test is $(median(Tscore)).")
+println("min, median, max times for score test are $(minimum(Tscore)),$(median(Tscore)), $(maximum(Tscore)).")
 # [init0[j].τ2 for j=1:B]
 
 #susie-GLMM
@@ -170,7 +171,8 @@ println("median time for score test is $(median(Tscore)).")
 
 b_true=zeros(p);
 # b_1s=zeros(B); 
-res1=[]; Tmm=zeros(B)
+res1=[]; Tm0=zeros(B);#for K0
+ Tmm=zeros(B); #K
 #  K=Matrix(1.0I,n,n);
 
 for j = 1:B
@@ -188,16 +190,16 @@ for j = 1:B
     # Xt, Xt₀, yt, init0 = initialization(Y,X,ones(n,1),T,S;tol=1e-4)     
     # res10 = susieGLMM(L,ones(p)/p,yt,Xt,Xt₀,S,init0;tol=1e-4)
     # @time res10 =susieGLMM(1,ones(p)/p,Y,X1,ones(n,1),T,S) 
-   t0= @elapsed res10=fineQTL_glmm(K0,G,Y,X;LOCO=false)
-    res1=[res1;res10]; Tmm[j]=t0
+   t0= @elapsed res10=fineQTL_glmm(K0,G,Y,X;L=L,LOCO=false)
+    res1=[res1;res10]; Tm0[j]=t0
 end
 
 
-b̂ = [res1[j].α[1]*res1[j].ν[1] for j=1:B]
-α̂ = [res1[j].α[1] for j=1:B]
+b̂ = [res1[2j-1].α[1]*res1[2j-1].ν[1] for j=1:B]
+α̂ = [res1[2j-1].α[1] for j=1:B]
 
 writedlm("./test/glmm-score-susie.txt",[b̂ α̂ b_1s])
-println("mediantime for susie-glmm is $(median(Tmm))")
+println("min, median, max times for susie-glmm are $(minimum(Tmm)), $(median(Tmm)),$(maximum(Tmm)).")
 
 using UnicodePlots
 scatterplot(b_1s,b̂,xlabel= "True effects", ylabel="Posterior estimate")
