@@ -222,7 +222,7 @@ function Seed(M::Int64)
         
         seeds = collect(M:1:M+np-1)
         
-        for j =1:np
+        for i =1:np
             remotecall_fetch(()->Random.seed!(seeds[i]),pid[i])
         end
         
