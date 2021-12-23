@@ -200,6 +200,7 @@ b̂ = [res1[2j-1].α[1]*res1[2j-1].ν[1] for j=1:B]
 
 writedlm("./test/glmm-score-susie.txt",[b̂ α̂ b_1s])
 println("min, median, max times for susie-glmm are $(minimum(Tmm)), $(median(Tmm)),$(maximum(Tmm)).")
+#min, median, max times for susie-glmm are 1.198, 8.719,14.329. for theoretic K
 
 using UnicodePlots
 scatterplot(b_1s,b̂,xlabel= "True effects", ylabel="Posterior estimate")

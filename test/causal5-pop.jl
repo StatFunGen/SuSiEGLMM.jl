@@ -7,10 +7,10 @@
 @everywhere using SuSiEGLMM
 
 
-### causal5:fam
-@time info=readdlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/causal5/fam_folder/ascertained_fam_12_10.bim");
-@time geno=readdlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/causal5/fam_folder/ascertained_fam_genotype_12_10.txt";header=true);
-@time pheno=readdlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/causal5/fam_folder/ascertained_fam_phenotype_12_10.txt";header=true); #464 x 4000 snps
+### causal5:pop
+@time info=readdlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/causal5/pop_folder/ascertained_pop_12_10.bim");
+@time geno=readdlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/causal5/pop_folder/ascertained_pop_genotype_12_10.txt";header=true);
+@time pheno=readdlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/causal5/pop_folder/ascertained_pop_phenotype_12_10.txt";header=true); #518 x 4000 snps
 snps =[1842,1976,2007,2119,2129]
 
 
@@ -25,8 +25,8 @@ snps =[1842,1976,2007,2119,2129]
 y=pheno[1][:,end]
 
 # kinship
-K=readdlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/causal5/fam_folder/fam_grm_ped.txt") #464
-K0=readdlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/causal5/fam_folder/fam_grm.txt");
+K=readdlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/causal5/pop_folder/pop_grm_ped.txt") #518
+K0=readdlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/causal5/pop_folder/pop_grm.txt");
 K0=Symmetric(K0);K0=convert(Matrix{Float64}, K0);
  n=size(K,1)
 K1=zeros(n,n,2);
@@ -50,8 +50,8 @@ end
 X = convert(Matrix{Float64},X)
 n,p = size(X)
 # L=3; Π = ones(p)/p
-#score test : detect 2 snps for both K's
-@time Tstat, pval= SuSiEGLMM.scoreTest(K,G,y,X;LOCO=false);
+#score test
+@time Tstat, pval= SuSiEGLMM.scoreTest(K0,G,y,X;LOCO=false);
 
     T, S = svdK(K0;LOCO=false)
     Xt, Xt₀, yt,init00= initialization(y,X,ones(n,1),T,S;tol=1e-4)
@@ -97,8 +97,8 @@ a4=sum(est4[2].α,dims=2)
 Seed(124)
 
 
- L=5; B=100;τ2=1.25;
-K0=K0+ (abs(eigmin(K0))+0.001)*I;
+ L=5; B=100;τ2=0.2;
+K0=K0+ (abs(eigmin(K0))+0.001)*I
 #GLM
 b_true=zeros(p);
 b_1s=zeros(B);b_2s=zeros(B); b_3s=zeros(B);
@@ -120,16 +120,14 @@ for j = 1:B
     g=rand(MvNormal(τ2*K0))
     Y= logistic.(X*b_true+g) .>rand(n) #generating binary outcome
     Y=convert(Vector{Float64},Y)
-    # writedlm("./testdata/dataY-julia.csv",Y)
-    # res0= susieGLM(L, ones(p)/p,Y,X,ones(n,1);tol=1e-4) 
+    
   t0=@elapsed  res0= fineQTL_glm(G,Y,X;tol=1e-4)
     res=[res;res0]; Tm[j]=t0
 end
 
 # writedlm("./test/glm-cau1.txt",[b̂ α̂ b_1s])
 println("min, median, max times for glm are $(minimum(Tm)), $(median(Tm)),$(maximum(Tm)).")
-#min, median, max times for glm are 1.340119074, 4.55010757,6.658738289. for K_ped
-#min, median, max times for glm are 0.680833783, 6.1597673465,8.669773913.
+#
 
 b̂1=zeros(B);b̂2=zeros(B);b̂3=zeros(B);b̂4=zeros(B);b̂5=zeros(B);
 for j=1:B
@@ -183,7 +181,7 @@ for j = 1:B
     b_true[4]= b_4s[j]
     b_true[5]= b_5s[j]
     # X=randn(n,p)
-    g=rand(MvNormal(τ2*K0))
+    g=rand(MvNormal(τ2*K))
     # writedlm("./testdata/dataX-julia.csv",X)
     Y= logistic.(X*b_true+g) .>rand(n) #generating binary outcome
     Y=convert(Vector{Float64},Y)
@@ -200,11 +198,11 @@ end
 # writedlm("./test/glmm-scoretest.txt",Ps)
 println("min, median, max times for score test are $(minimum(Tscore)), $(median(Tscore)),$(maximum(Tscore)).")
 #for thoeretical K
-histogram(Ps[1,:],bins=20) #79% at α=0.05
-histogram(Ps[2,:],bins=20) # 77%
-histogram(Ps[3,:],bins=20) #68%
-histogram(Ps[4,:],bins=20) #78%
-histogram(Ps[5,:],bins=20)#81%
+histogram(Ps[1,:],bins=20) #80% at α=0.05
+histogram(Ps[2,:],bins=20) # 82%
+histogram(Ps[3,:],bins=20) #65%
+histogram(Ps[4,:],bins=20)
+histogram(Ps[5,:],bins=20)
 
 
 #susie-GLMM
@@ -232,14 +230,13 @@ for j = 1:B
     # Xt, Xt₀, yt, init0 = initialization(Y,X,ones(n,1),T,S;tol=1e-4)     
     # res10 = susieGLMM(L,ones(p)/p,yt,Xt,Xt₀,S,init0;tol=1e-4)
     # @time res10 =susieGLMM(1,ones(p)/p,Y,X1,ones(n,1),T,S) 
-   t0= @elapsed res10=fineQTL_glmm(K0,G,Y,X;LOCO=false)
+   t0= @elapsed res10=fineQTL_glmm(K,G,Y,X;LOCO=false)
     res1=[res1;res10]; Tmm[j]=t0
 end
 
 
 # writedlm("./test/glmm-score-susie.txt",[b̂ α̂ b_1s])
 println("min, median, max times for score test are $(minimum(Tmm)), $(median(Tmm)),$(maximum(Tmm)).")
-#min, median, max times for score test are 5.324848486, 14.978299406,56.49418443. for K_ped
 
 b̂1=zeros(B);b̂2=zeros(B);b̂3=zeros(B);b̂4=zeros(B);b̂5=zeros(B);
 for j=1:B
@@ -256,11 +253,11 @@ end
 
 
 scatterplot(b_1s,b̂1,title="susie-glmm",xlabel= "True effects", ylabel="Posterior estimate1")
-scatterplot(b_1s,α̂1,title="susie-glmm", xlabel="True effects",ylabel="pip1")
-scatterplot(b_2s,b̂2,title="susie-glmm",xlabel= "True effects", ylabel="Posterior estimate2")
-scatterplot(b_2s,α̂2,title="susie-glmm", xlabel="True effects",ylabel="pip2")
-scatterplot(b_3s,b̂3,title="susie-glmm",xlabel= "True effects", ylabel="Posterior estimate3")
-scatterplot(b_3s,α̂3, title="susie-glmm",xlabel="True effects",ylabel="pip3")
+scatterplot(b_1s,α̂1, xlabel="True effects",ylabel="pip1")
+scatterplot(b_2s,b̂2,xlabel= "True effects", ylabel="Posterior estimate2")
+scatterplot(b_2s,α̂2, xlabel="True effects",ylabel="pip2")
+scatterplot(b_3s,b̂3,xlabel= "True effects", ylabel="Posterior estimate3")
+scatterplot(b_3s,α̂3, xlabel="True effects",ylabel="pip3")
 scatterplot(b_4s,b̂4,title="susie-glmm",xlabel= "True effects", ylabel="Posterior estimate3")
 scatterplot(b_4s,α̂4,title="susie-glmm", xlabel="True effects",ylabel="pip4")
 scatterplot(b_5s,b̂5,title="susie-glmm",xlabel= "True effects", ylabel="Posterior estimate3")

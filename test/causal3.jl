@@ -6,16 +6,16 @@
 @everywhere using SuSiEGLMM
 
 
-### causal1:pop
+### causal3:pop
 @time info=readdlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/causal3/fam_folder/ascertained_fam_12_10.bim");
 @time geno=readdlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/causal3/fam_folder/ascertained_fam_genotype_12_10.txt";header=true);
 @time pheno=readdlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/causal3/fam_folder/ascertained_fam_phenotype_12_10.txt";header=true); #518 x 4000 snps
 snps =[13,187,1977]
 
 # covariate: sex
-C = pheno[1][:,end-1]
-C[C.==1].=0.0
-C[C.==2].=1.0
+# C = pheno[1][:,end-1]
+# C[C.==1].=0.0
+# C[C.==2].=1.0
 
 #last col: trait
 # y=convert(Vector{Float64},data[1][:,end])
@@ -121,7 +121,7 @@ end
 
 # writedlm("./test/glm-cau1.txt",[b̂ α̂ b_1s])
 println("min, median, max times for glm are $(minimum(Tm)), $(median(Tm)),$(maximum(Tm)).")
-#min, median, max times for glm are 3.190954366, 4.153022738500001,5.134813023.
+#min, median, max times for glm are 3.19, 4.151,5.13.
 
 b̂1=zeros(B);b̂2=zeros(B);b̂3=zeros(B);
 for j=1:B
