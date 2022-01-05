@@ -90,26 +90,31 @@ function susieGLMM(L::Int64,Π::Vector{Float64},yt::Vector{Float64},Xt::Matrix{F
 end 
 
 # version 2
-function susieGLMM(L::Int64,Π::Vector{Float64},y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float64},T::Matrix{Float64},
+function susieGLMM(L::Int64,Π::Vector{Float64},y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float64},Vector{Float64}},T::Matrix{Float64},
     S::Vector{Float64};tol=1e-4)
 
 
      
 # check if covariates are added as input and include the intercept. 
-     n=length(y) 
-        if(X₀!= ones(n,1)) #&&(size(X₀,2)>1)
-            X₀ = hcat(ones(n),X₀)
-        end
+    #  n=length(y) 
+    #     if(X₀!= ones(n,1)) #&&(size(X₀,2)>1)
+    #         X₀ = hcat(ones(n),X₀)
+    #     end
 
     Xt, Xt₀, yt = rotate(y,X,X₀,T)   
-    #initialization :
-    σ0 = 0.1*ones(L); τ0 = rand(1)[1]; #arbitray
+    # #initialization :
+    σ0 = 0.1*ones(L); 
+     τ0 = rand(1)[1]; #arbitray
     β0 = glm(X₀,y,Binomial()) |> coef 
     ν0 =sum(repeat(Π,outer=(1,L)).*σ0',dims=2)[:,1] ; #ν²0
     ξ0 =sqrt.(getXy('N',Xt.^2.0,ν0)+ getXy('N',Xt₀,β0).^2+ τ0*S )
- 
+    
+    
+    # res0 = susieGLM(L,Π,y,X,X₀;tol=1e-2)
+    # ξ0 = sqrt.(res0.ξ.^2+τ0*S)
 
     result = emGLMM(L,yt,Xt,Xt₀,S,τ0,β0,ξ0,σ0,Π;tol=tol)
+    # result = emGLMM(L,yt,Xt,Xt₀,S,τ0,res0.β,ξ0,res0.σ0,Π;tol=tol)
         
 return result
 

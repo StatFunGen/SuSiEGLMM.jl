@@ -27,7 +27,7 @@ y=pheno[1][:,end]
 # kinship
 K=readdlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/causal1/pop/pop_grm_ped.txt") #518
 K0=readdlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/causal1/pop/pop_grm.txt");
-K0=Symmetric(K0);
+K0=Symmetric(K0);K0=convert(Matrix{Float64}, K0);
  n=size(K,1)
 K1=zeros(n,n,2);
 K1[:,:,1]=K; K1[:,:,2]=K0;
@@ -170,15 +170,16 @@ println("min, median, max times for score test are $(minimum(Tscore)),$(median(T
 
 
 b_true=zeros(p);
-# b_1s=zeros(B); 
+b_1s=zeros(B); 
 res1=[]; Tm0=zeros(B);#for K0
  Tmm=zeros(B); #K
 #  K=Matrix(1.0I,n,n);
 
 for j = 1:B
 
-    # b_true[1]= randn(1)[1] 
-    b_true[1]=b_1s[j]
+    b_true[1]= randn(1)[1] 
+    b_1s[j] = b_true[1]
+    # b_true[1]=b_1s[j]
     # X=randn(n,p)
 
     g=rand(MvNormal(τ2*K0))
@@ -201,7 +202,7 @@ b̂ = [res1[2j-1].α[1]*res1[2j-1].ν[1] for j=1:B]
 writedlm("./test/glmm-score-susie.txt",[b̂ α̂ b_1s])
 println("min, median, max times for susie-glmm are $(minimum(Tmm)), $(median(Tmm)),$(maximum(Tmm)).")
 #min, median, max times for susie-glmm are 1.198, 8.719,14.329. for theoretic K
-
+println("min, median, max times for susie-glmm are $(minimum(Tm0)), $(median(Tm0)),$(maximum(Tm0)).")
 using UnicodePlots
 scatterplot(b_1s,b̂,xlabel= "True effects", ylabel="Posterior estimate")
 scatterplot(b_1s,α̂, xlabel="True effects",ylabel="pip")
