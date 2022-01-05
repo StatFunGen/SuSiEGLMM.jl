@@ -175,7 +175,12 @@ function mStep!(ξ_new::Vector{Float64},β_new::Vector{Float64},A1::Matrix{Float
          U= AB[j,:]*AB[j,:]'
          ξ_new[j]  = ξ_new[j] +sum(U)-tr(U)
       end
-    
+
+    temp= ξ_new + ŷ₀.^2 + ghat2 + 2(ŷ₀ +ghat).*B2+ 2(ŷ₀.*ghat);
+    tidx=findall(temp.<0.0)
+    if (!isempty(tidx))
+       writedlm("./test/domainErr_idx.txt",[tidx temp[tidx] ξ_new[tidx] ghat2[tidx] ghat[tidx] ((ŷ₀ +ghat).*B2)[tidx] ])
+    end
     ξ_new[:] = sqrt.(ξ_new + ŷ₀.^2 + ghat2 + 2(ŷ₀ +ghat).*B2+ 2(ŷ₀.*ghat))
         
     # β_new[:]= symXX('T',sqrt.(λ).*Xt₀)\getXy('T',Xt₀,(yt- λ.*(AB + ghat)))

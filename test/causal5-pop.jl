@@ -127,7 +127,7 @@ end
 
 # writedlm("./test/glm-cau1.txt",[b̂ α̂ b_1s])
 println("min, median, max times for glm are $(minimum(Tm)), $(median(Tm)),$(maximum(Tm)).")
-#
+#min, median, max times for glm are 5.666828984, 7.7632395855,10.995734686. for K0
 
 b̂1=zeros(B);b̂2=zeros(B);b̂3=zeros(B);b̂4=zeros(B);b̂5=zeros(B);
 for j=1:B
@@ -181,7 +181,7 @@ for j = 1:B
     b_true[4]= b_4s[j]
     b_true[5]= b_5s[j]
     # X=randn(n,p)
-    g=rand(MvNormal(τ2*K))
+    g=rand(MvNormal(τ2*K0))
     # writedlm("./testdata/dataX-julia.csv",X)
     Y= logistic.(X*b_true+g) .>rand(n) #generating binary outcome
     Y=convert(Vector{Float64},Y)
@@ -196,7 +196,7 @@ for j = 1:B
 end
 
 # writedlm("./test/glmm-scoretest.txt",Ps)
-println("min, median, max times for score test are $(minimum(Tscore)), $(median(Tscore)),$(maximum(Tscore)).")
+println("min, median, max times for score test are $(minimum(Tscore)),$(median(Tscore)),$(maximum(Tscore)).")
 #for thoeretical K
 histogram(Ps[1,:],bins=20) #80% at α=0.05
 histogram(Ps[2,:],bins=20) # 82%
@@ -230,14 +230,14 @@ for j = 1:B
     # Xt, Xt₀, yt, init0 = initialization(Y,X,ones(n,1),T,S;tol=1e-4)     
     # res10 = susieGLMM(L,ones(p)/p,yt,Xt,Xt₀,S,init0;tol=1e-4)
     # @time res10 =susieGLMM(1,ones(p)/p,Y,X1,ones(n,1),T,S) 
-   t0= @elapsed res10=fineQTL_glmm(K,G,Y,X;LOCO=false)
+   t0= @elapsed res10=fineQTL_glmm(K0,G,Y,X;LOCO=false)
     res1=[res1;res10]; Tmm[j]=t0
 end
 
 
 # writedlm("./test/glmm-score-susie.txt",[b̂ α̂ b_1s])
 println("min, median, max times for score test are $(minimum(Tmm)), $(median(Tmm)),$(maximum(Tmm)).")
-
+#min, median, max times for score test are 3.434145138, 7.687690389,34.555872684. for K0
 b̂1=zeros(B);b̂2=zeros(B);b̂3=zeros(B);b̂4=zeros(B);b̂5=zeros(B);
 for j=1:B
 A = sum(res1[2j-1].α.*res1[2j-1].ν,dims=2)[:,1]
@@ -253,11 +253,11 @@ end
 
 
 scatterplot(b_1s,b̂1,title="susie-glmm",xlabel= "True effects", ylabel="Posterior estimate1")
-scatterplot(b_1s,α̂1, xlabel="True effects",ylabel="pip1")
-scatterplot(b_2s,b̂2,xlabel= "True effects", ylabel="Posterior estimate2")
-scatterplot(b_2s,α̂2, xlabel="True effects",ylabel="pip2")
-scatterplot(b_3s,b̂3,xlabel= "True effects", ylabel="Posterior estimate3")
-scatterplot(b_3s,α̂3, xlabel="True effects",ylabel="pip3")
+scatterplot(b_1s,α̂1,title="susie-glmm", xlabel="True effects",ylabel="pip1")
+scatterplot(b_2s,b̂2,title="susie-glmm",xlabel= "True effects", ylabel="Posterior estimate2")
+scatterplot(b_2s,α̂2,title="susie-glmm", xlabel="True effects",ylabel="pip2")
+scatterplot(b_3s,b̂3,title="susie-glmm",xlabel= "True effects", ylabel="Posterior estimate3")
+scatterplot(b_3s,α̂3,title="susie-glmm", xlabel="True effects",ylabel="pip3")
 scatterplot(b_4s,b̂4,title="susie-glmm",xlabel= "True effects", ylabel="Posterior estimate3")
 scatterplot(b_4s,α̂4,title="susie-glmm", xlabel="True effects",ylabel="pip4")
 scatterplot(b_5s,b̂5,title="susie-glmm",xlabel= "True effects", ylabel="Posterior estimate3")
