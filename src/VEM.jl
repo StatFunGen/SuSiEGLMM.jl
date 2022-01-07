@@ -179,7 +179,9 @@ function mStep!(ξ_new::Vector{Float64},β_new::Vector{Float64},A1::Matrix{Float
     temp= ξ_new + ŷ₀.^2 + ghat2 + 2(ŷ₀ +ghat).*B2+ 2(ŷ₀.*ghat);
     tidx=findall(temp.<0.0)
     if (!isempty(tidx))
-       writedlm("./test/domainErr_idx.txt",[tidx temp[tidx] ξ_new[tidx] ghat2[tidx] ghat[tidx] ((ŷ₀ +ghat).*B2)[tidx] ])
+        # writedlm("./test/err-beta.txt",β)
+        writedlm("./test/err-b.txt",[AB B2])
+       writedlm("./test/domain-err-h1.txt",[tidx temp[tidx] ξ_new[tidx] ghat2[tidx] ghat[tidx] ŷ₀[tidx] ((ŷ₀ +ghat).*B2)[tidx] ])
     end
     ξ_new[:] = sqrt.(ξ_new + ŷ₀.^2 + ghat2 + 2(ŷ₀ +ghat).*B2+ 2(ŷ₀.*ghat))
         
@@ -196,7 +198,12 @@ function mStep!(ξ_new::Vector{Float64},β_new::Vector{Float64},
   
     ŷ₀ = getXy('N',Xt₀,β)
 
-   
+    temp= ŷ₀.^2 + ghat2 + 2(ŷ₀.*ghat)
+    tidx =findall(temp.<0.0)
+    if (!isempty(tidx))
+        writedlm("./test/err_beta_h0.txt",β)
+        writedlm("./test/domain_error_h0.txt",[tidx temp[tidx] ghat2[tidx] ŷ₀[tidx] ghat[tidx] ])
+    end
     ξ_new[:] = sqrt.(ŷ₀.^2 + ghat2 + 2(ŷ₀.*ghat))  # check for debugging!
     # λ= 2Lambda.(ξ_new) #for check
     β_new[:]=  getXX('T',Xt₀,'N',(λ.*Xt₀))\getXy('T',Xt₀,(yt- λ.*ghat))

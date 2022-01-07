@@ -129,28 +129,29 @@ scatterplot(b_1s,α̂, xlabel="True effects",ylabel="pip")
 #GLMM :scroe test
 
 # n=100; p=10; 
-
+X1= (X.-mean(X,dims=2))./std(X,dims=2)
 # K2=Symmetric(K0)
 b_true=zeros(p);
-# b_1s=zeros(B); init0=[]; 
+b_1s=zeros(B); 
+# init0=[]; 
 Ps=zeros(p,B); Tscore=zeros(B);
 
 
-# F =cholesky(K2)
-# f = svd(F.U)
-# T,S = f.Vt, f.S.^2
-K0=convert(Matrix{Float64},K0);
-T,S = svdK(K0;LOCO=false)
-# H=svd(K2);
+# # F =cholesky(K2)
+# # f = svd(F.U)
+# # T,S = f.Vt, f.S.^2
+# K0=convert(Matrix{Float64},K0);
+# T,S = svdK(K0;LOCO=false)
+# # H=svd(K2);
 for j = 1:B
 
-    # b_true[1]= randn(1)[1] 
-    # b_1s[j] = b_true[1]
-    b_true[1]=b_1s[j]
+    b_true[1]= randn(1)[1] 
+    b_1s[j] = b_true[1]
+    # b_true[1]=b_1s[j]
     # X=randn(n,p)
-    g=rand(MvNormal(τ2*K))
+    g=rand(MvNormal(τ2*K0))
     # writedlm("./testdata/dataX-julia.csv",X)
-    Y= logistic.(X*b_true+g) .>rand(n) #generating binary outcome
+    Y= logistic.(X1*b_true+g) .>rand(n) #generating binary outcome
     Y=convert(Vector{Float64},Y)
     # writedlm("./testdata/dataY-julia.csv",Y)
     
@@ -158,7 +159,7 @@ for j = 1:B
     # T0= computeT(init00,yt,Xt₀,Xt)
     # init0=[init0;init00]
     # Ts[:,j]=T0
-   t0= @elapsed Ts,P0= scoreTest(K,G,Y,X;LOCO=false);
+   t0= @elapsed Ts,P0= scoreTest(K0,G,Y,X1;LOCO=false);
    Ps[:,j]=P0; Tscore[j]=t0
 end
 
@@ -184,20 +185,20 @@ for j = 1:B
 
     g=rand(MvNormal(τ2*K0))
     # writedlm("./testdata/dataX-julia.csv",X)
-    Y= logistic.(X*b_true+g) .>rand(n) #generating binary outcome
+    Y= logistic.(X1*b_true+g) .>rand(n) #generating binary outcome
     Y=convert(Vector{Float64},Y)
     # writedlm("./testdata/dataY-julia.csv",Y)
     # T, S = svdK(K;LOCO=false)
     # Xt, Xt₀, yt, init0 = initialization(Y,X,ones(n,1),T,S;tol=1e-4)     
     # res10 = susieGLMM(L,ones(p)/p,yt,Xt,Xt₀,S,init0;tol=1e-4)
     # @time res10 =susieGLMM(1,ones(p)/p,Y,X1,ones(n,1),T,S) 
-   t0= @elapsed res10=fineQTL_glmm(K0,G,Y,X;L=L,LOCO=false)
+   t0= @elapsed res10=fineQTL_glmm(K0,G,Y,X1;L=L,LOCO=false)
     res1=[res1;res10]; Tm0[j]=t0
 end
 
 
-b̂ = [res1[2j-1].α[1]*res1[2j-1].ν[1] for j=1:B]
-α̂ = [res1[2j-1].α[1] for j=1:B]
+b̂ = [res1[2j-1].α[1]*res1[2j-1].ν[1] for j=1:58]
+α̂ = [res1[2j-1].α[1] for j=B]
 
 writedlm("./test/glmm-score-susie.txt",[b̂ α̂ b_1s])
 println("min, median, max times for susie-glmm are $(minimum(Tmm)), $(median(Tmm)),$(maximum(Tmm)).")
