@@ -197,8 +197,8 @@ for j = 1:B
 end
 
 
-b̂ = [res1[2j-1].α[1]*res1[2j-1].ν[1] for j=1:58]
-α̂ = [res1[2j-1].α[1] for j=B]
+b̂ = [res1[2j-1].α[1]*res1[2j-1].ν[1] for j=1:B]
+α̂ = [res1[2j-1].α[1] for j=1:B]
 
 writedlm("./test/glmm-score-susie.txt",[b̂ α̂ b_1s])
 println("min, median, max times for susie-glmm are $(minimum(Tmm)), $(median(Tmm)),$(maximum(Tmm)).")
