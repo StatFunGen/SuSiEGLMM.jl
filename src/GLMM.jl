@@ -63,7 +63,7 @@ function initialization(y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix
      Xt, Xt₀, yt = rotate(y,X,X₀,T)   
     #  y0= getXy('N',T,y) # rotate w/o centering for β0
     #initialization
-     τ0 = rand(1)[1]; #arbitray
+     τ0 = 0.0001 #rand(1)[1]; #arbitray
     # τ0=1.2   
     β0 = glm(X₀,y,Binomial()) |> coef
     ξ0 =sqrt.(getXy('N',Xt₀,β0).^2+ τ0*S)
@@ -104,7 +104,7 @@ function susieGLMM(L::Int64,Π::Vector{Float64},y::Vector{Float64},X::Matrix{Flo
     Xt, Xt₀, yt = rotate(y,X,X₀,T)   
     # #initialization :
     σ0 = 0.1*ones(L); 
-     τ0 = rand(1)[1]; #arbitray
+     τ0 = 0.0001  #rand(1)[1]; #arbitray
     β0 = glm(X₀,y,Binomial()) |> coef 
     ν0 =sum(repeat(Π,outer=(1,L)).*σ0',dims=2)[:,1] ; #ν²0
     ξ0 =sqrt.(getXy('N',Xt.^2.0,ν0)+ getXy('N',Xt₀,β0).^2+ τ0*S )
@@ -128,8 +128,9 @@ function computeT(init0::Null_est,yt::Vector{Float64},Xt₀::Matrix{Float64},Xt:
         r₀ =  2*yt.*(getXy('N',Xt₀,init0.β)+init0.μ)  
         p̂ = logistic.(r₀)
         Γ  = p̂.*(1.0.-p̂)
-        
+        # XX=Xt₀'Diagonal(Γ)
         proj= I - Xt₀*(symXX('T',sqrt.(Γ).*Xt₀)\(Xt₀'Diagonal(Γ)))
+        # proj = I - Xt₀*(getXX('N',XX,'N',Xt₀))\XX
         G̃ = getXX('N',proj,'N',Xt)
     
         Tstat= zeros(m)

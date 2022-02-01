@@ -181,9 +181,12 @@ function mStep!(ξ_new::Vector{Float64},β_new::Vector{Float64},A1::Matrix{Float
     if (!isempty(tidx))
         # writedlm("./test/err-beta.txt",β)
         writedlm("./test/err-b.txt",[AB B2])
-       writedlm("./test/domain-err-h1.txt",[tidx temp[tidx] ξ_new[tidx] ghat2[tidx] ghat[tidx] ŷ₀[tidx] ((ŷ₀ +ghat).*B2)[tidx] ])
+        writedlm("./test/domain-err-h1.txt",[repeat([myid()],length(tidx)) tidx temp[tidx] ξ_new[tidx] ghat2[tidx] ghat[tidx] ŷ₀[tidx] ((ŷ₀ +ghat).*B2)[tidx] ])
+    #    temp[tidx].= 0.000001
+       temp.= 0.00001
     end
-    ξ_new[:] = sqrt.(ξ_new + ŷ₀.^2 + ghat2 + 2(ŷ₀ +ghat).*B2+ 2(ŷ₀.*ghat))
+    # ξ_new[:] = sqrt.(ξ_new + ŷ₀.^2 + ghat2 + 2(ŷ₀ +ghat).*B2+ 2(ŷ₀.*ghat))
+      ξ_new[:] = sqrt.(temp)
         
     # β_new[:]= symXX('T',sqrt.(λ).*Xt₀)\getXy('T',Xt₀,(yt- λ.*(AB + ghat)))
      β_new[:]= getXX('T',Xt₀,'N',(λ.*Xt₀))\getXy('T',Xt₀,(yt- λ.*(B2 + ghat)))
@@ -202,9 +205,13 @@ function mStep!(ξ_new::Vector{Float64},β_new::Vector{Float64},
     tidx =findall(temp.<0.0)
     if (!isempty(tidx))
         writedlm("./test/err_beta_h0.txt",β)
-        writedlm("./test/domain_error_h0.txt",[tidx temp[tidx] ghat2[tidx] ŷ₀[tidx] ghat[tidx] ])
+        writedlm("./test/domain_error_h0.txt",[myid() tidx temp[tidx] ghat2[tidx] ŷ₀[tidx] ghat[tidx] ])
+        # temp[tidx].= 0.000001
+        temp.= 0.00001
     end
-    ξ_new[:] = sqrt.(ŷ₀.^2 + ghat2 + 2(ŷ₀.*ghat))  # check for debugging!
+    
+    # ξ_new[:] = sqrt.(ŷ₀.^2 + ghat2 + 2(ŷ₀.*ghat))  # check for debugging!
+    ξ_new[:] = sqrt.(temp)
     # λ= 2Lambda.(ξ_new) #for check
     β_new[:]=  getXX('T',Xt₀,'N',(λ.*Xt₀))\getXy('T',Xt₀,(yt- λ.*ghat))
             
@@ -263,7 +270,7 @@ function ELBO(L::Int64,ξ_new::Vector{Float64},β_new::Vector{Float64},σ0_new::
     
                
       bl= sum(lnb)+0.5*(sum(log.(σ0_new))- L)+ 0.5*sum(sum(AB2,dims=1)'./σ0_new)
-     
+    
          
     return elbo0-bl
             
@@ -360,10 +367,15 @@ function emGLMM(L::Int64,yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{F
          mStep!(ξ_new,β_new,A1,B1,AB2,ghat,ghat2,λ,yt,Xt,Xt₀,β,L)
         
          el1=ELBO(L,ξ_new,β_new,σ0_new,τ2_new,A1,B1,AB2,Sig1,Π,ghat,ghat2,Vg,S,yt,Xt,Xt₀)
-     
+         if (isnan(el1))
+           writedlm("./test/elbo_nan1.txt",[β_new σ0_new τ2_new])
+           writedlm("./test/elbo_nan_xi.txt",ξ_new)
+         
+         end
+         
          crit=abs(el1-el0)
          #check later for performance
-        #  crit=norm(ξ_new-ξ)+norm(β_new-β)+abs(τ2_new-τ2)+abs(el1-el0)+norm(B1-B0)
+        #crit=norm(ξ_new-ξ)+norm(β_new-β)+abs(τ2_new-τ2)+norm(B1-B0)+norm(σ0_new-σ0)
          
          ξ=ξ_new;β=β_new;σ0=σ0_new; τ2=τ2_new;el0=el1;A0[:,:]=A1;B0[:,:]=B1
         
@@ -371,7 +383,7 @@ function emGLMM(L::Int64,yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{F
         
         
     end
-    
+    println(numitr)
     return Result(ξ,β,σ0,τ2,el0,A1, B1, Sig1)
         
 end
@@ -417,7 +429,7 @@ function emGLMM(yt,Xt₀,S,τ2,β,ξ;tol::Float64=1e-4)
         
           numitr +=1        
     end
-    
+    println(numitr)
     return Null_est(ξ,β,ghat,τ2,el0)
     
 end
