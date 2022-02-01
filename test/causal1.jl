@@ -105,15 +105,16 @@ b_1s=zeros(B);
 res=[];Tm=zeros(B);
 
 for j = 1:B
-    b_true[1]= randn(1)[1] 
-    b_1s[j] = b_true[1]
+    # b_true[1]= randn(1)[1] 
+    # b_1s[j] = b_true[1]
+    b_true[1]=b_1s[j]
     # X=randn(n,p)
     g=rand(MvNormal(τ2*K0)) 
-    Y= logistic.(X*b_true+g) .>rand(n) #generating binary outcome
+    Y= logistic.(X1*b_true+g) .>rand(n) #generating binary outcome
     Y=convert(Vector{Float64},Y)
     # writedlm("./testdata/dataY-julia.csv",Y)
     # res0= susieGLM(L, ones(p)/p,Y,X,ones(n,1);tol=1e-4) 
-  t0=@elapsed  res0= fineQTL_glm(G,Y,X;L=L,tol=1e-4)
+  t0=@elapsed  res0= fineQTL_glm(G,Y,X1;L=L,tol=1e-4)
     res=[res;res0]; Tm[j]=t0
 end
 
@@ -133,15 +134,15 @@ X1= (X.-mean(X,dims=2))./std(X,dims=2)
 # K2=Symmetric(K0)
 b_true=zeros(p);
 b_1s=zeros(B); 
-# init0=[]; 
-Ps=zeros(p,B); Tscore=zeros(B);
+init0=[]; 
+Ps=zeros(p,B); Tscore=zeros(p,B);tt=zeros(B);
 
 
 # # F =cholesky(K2)
 # # f = svd(F.U)
 # # T,S = f.Vt, f.S.^2
 # K0=convert(Matrix{Float64},K0);
-# T,S = svdK(K0;LOCO=false)
+T,S = svdK(K0;LOCO=false)
 # # H=svd(K2);
 for j = 1:B
 
@@ -155,12 +156,13 @@ for j = 1:B
     Y=convert(Vector{Float64},Y)
     # writedlm("./testdata/dataY-julia.csv",Y)
     
-    # Xt, Xt₀, yt,init00= initialization(Y,X1,ones(n,1),T,S;tol=1e-4)
-    # T0= computeT(init00,yt,Xt₀,Xt)
-    # init0=[init0;init00]
-    # Ts[:,j]=T0
-   t0= @elapsed Ts,P0= scoreTest(K0,G,Y,X1;LOCO=false);
-   Ps[:,j]=P0; Tscore[j]=t0
+    Xt, Xt₀, yt,init00= initialization(Y,X1,ones(n,1),T,S;tol=1e-4)
+    T0= computeT(init00,yt,Xt₀,Xt)
+    init0=[init0;init00]
+    Tscore[:,j]=T0
+    Ps[:,j]=ccdf.(Chisq(1),T0)
+#    t0= @elapsed Ts,P0= scoreTest(K0,G,Y,X1;LOCO=false);
+#    Ps[:,j]=P0; tt[j]=t0; Tscore[:,j]=Ts
 end
 
 writedlm("./test/glmm-scoretest.txt",Ps)
