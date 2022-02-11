@@ -108,8 +108,8 @@ for j = 1:B
     # b_true[1]= randn(1)[1] 
     # b_1s[j] = b_true[1]
     b_true[1]=b_1s[j]
-    # X=randn(n,p)
-    g=rand(MvNormal(τ2*K0)) 
+    X=randn(n,p)
+    g=rand(MvNormal(τ2*K)) 
     Y= logistic.(X1*b_true+g) .>rand(n) #generating binary outcome
     Y=convert(Vector{Float64},Y)
     # writedlm("./testdata/dataY-julia.csv",Y)
@@ -142,7 +142,7 @@ Ps=zeros(p,B); Tscore=zeros(p,B);tt=zeros(B);
 # # f = svd(F.U)
 # # T,S = f.Vt, f.S.^2
 # K0=convert(Matrix{Float64},K0);
-T,S = svdK(K0;LOCO=false)
+T,S = svdK(K;LOCO=false)
 # # H=svd(K2);
 for j = 1:B
 
@@ -169,12 +169,13 @@ writedlm("./test/glmm-scoretest.txt",Ps)
 println("min, median, max times for score test are $(minimum(Tscore)),$(median(Tscore)), $(maximum(Tscore)).")
 # [init0[j].τ2 for j=1:B]
 
-#susie-GLMM
+#susie-GLMM & glm
 
 
 b_true=zeros(p);
 b_1s=zeros(B); 
-res1=[]; Tm0=zeros(B);#for K0
+rglm=[];rglmm=[];
+ Tm0=zeros(B);#for K0
  Tmm=zeros(B); #K
 #  K=Matrix(1.0I,n,n);
 
@@ -183,29 +184,57 @@ for j = 1:B
     b_true[1]= randn(1)[1] 
     b_1s[j] = b_true[1]
     # b_true[1]=b_1s[j]
-    # X=randn(n,p)
+    X=randn(n,p)
 
-    g=rand(MvNormal(τ2*K0))
+    g=rand(MvNormal(τ2*K))
     # writedlm("./testdata/dataX-julia.csv",X)
-    Y= logistic.(X1*b_true+g) .>rand(n) #generating binary outcome
+    Y= logistic.(X*b_true+g) .>rand(n) #generating binary outcome
     Y=convert(Vector{Float64},Y)
     # writedlm("./testdata/dataY-julia.csv",Y)
     # T, S = svdK(K;LOCO=false)
-    # Xt, Xt₀, yt, init0 = initialization(Y,X,ones(n,1),T,S;tol=1e-4)     
-    # res10 = susieGLMM(L,ones(p)/p,yt,Xt,Xt₀,S,init0;tol=1e-4)
+    Xt, Xt₀, yt, init0 = initialization(Y,X,ones(n,1),T,S;tol=1e-4)     
+   t0= @elapsed res10 = susieGLMM(L,ones(p)/p,yt,Xt,Xt₀,S,init0;tol=1e-4)
     # @time res10 =susieGLMM(1,ones(p)/p,Y,X1,ones(n,1),T,S) 
-   t0= @elapsed res10=fineQTL_glmm(K0,G,Y,X1;L=L,LOCO=false)
-    res1=[res1;res10]; Tm0[j]=t0
+#    t0= @elapsed res10=fineQTL_glmm(K,G,Y,X1;L=L,LOCO=false)
+    rglmm=[rglmm;res10];# Tm0[j]=t0
+    
+   t1=@elapsed res0= susieGLM(L,ones(p)/p,Y,X,ones(n,1);tol=1e-4)
+    rglm=[rglm;res0]
+    Tm0[j]=t0;Tmm[j]=t1
 end
 
+b̂1 = [rglm[j].α[1]*rglm[j].ν[1] for j=1:B]
+α̂1 = [rglm[j].α[1] for j=1:B]
 
-b̂ = [res1[2j-1].α[1]*res1[2j-1].ν[1] for j=1:B]
-α̂ = [res1[2j-1].α[1] for j=1:B]
+
+b̂ = [rglmm[j].α[1]*rglmm[j].ν[1] for j=1:B]
+α̂ = [rglmm[j].α[1] for j=1:B]
+
+# b̂ = [res1[2j-1].α[1]*res1[2j-1].ν[1] for j=1:B]
+# α̂ = [res1[2j-1].α[1] for j=1:B]
 
 writedlm("./test/glmm-score-susie.txt",[b̂ α̂ b_1s])
 println("min, median, max times for susie-glmm are $(minimum(Tmm)), $(median(Tmm)),$(maximum(Tmm)).")
 #min, median, max times for susie-glmm are 1.198, 8.719,14.329. for theoretic K
-println("min, median, max times for susie-glmm are $(minimum(Tm0)), $(median(Tm0)),$(maximum(Tm0)).")
+println("min, median, max times for susie-glm are $(minimum(Tm0)), $(median(Tm0)),$(maximum(Tm0)).")
 using UnicodePlots
 scatterplot(b_1s,b̂,xlabel= "True effects", ylabel="Posterior estimate")
-scatterplot(b_1s,α̂, xlabel="True effects",ylabel="pip")
+scatterplot(b_1s,α̂, xlabel="True effects",ylabel="PIP")
+
+ll=@layout[a;b]; l2=@layout[a b;c d]
+p1=scatter(b_1s,b̂1,xlabel= "True effects", ylabel="Posterior estimate",label=false,title="SuSiE-GLM")
+p2=scatter(b_1s,α̂1, xlabel="True effects",ylabel="PIP",label=false,title="SuSiE-GLM")
+
+p3=scatter(b_1s,b̂,xlabel= "True effects", ylabel="Posterior estimate",label=false,title="SuSiE-GLMM")
+p4=scatter(b_1s,α̂, xlabel="True effects",ylabel="PIP",label=false,title="SuSiEGLMM")
+plot(p1,p3,p2,p4,layout=l2)
+
+Xt, Xt₀, yt, init0 = initialization(y[:,1],X,ones(n,1),T,S;tol=1e-4)     
+   t0= @elapsed res10 = susieGLMM(10,ones(p)/p,yt,Xt,Xt₀,S,init0;tol=1e-4)
+  
+   t1=@elapsed res0= susieGLM(10,ones(p)/p,y[:,1],X,ones(n,1);tol=1e-4)
+
+b̂1 = maximum(res0.α.*res0.ν;dims=2)
+
+
+
