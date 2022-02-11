@@ -162,7 +162,8 @@ Ps=zeros(p,B); Tscore=zeros(B);tt=zeros(p,B);
 # T,S = svdK(K0;LOCO=false)
 # H=svd(K2);
 for j = 1:B
-
+    
+    
     b_true[1]= b_1s[j]
     b_true[2]= b_2s[j]
     b_true[3]= b_3s[j]
@@ -190,7 +191,7 @@ histogram(Ps[3,:],bins=20) #65%
 
 #susie-GLMM
 
-
+X1= (X.-mean(X,dims=2))./std(X,dims=2)
 b_true=zeros(p);
 # b_1s=zeros(B); 
 res1=[]; Tmm=zeros(B)
@@ -198,22 +199,28 @@ res1=[]; Tmm=zeros(B)
 
 for j = 1:B
 
-    # b_true[1]= randn(1)[1] 
-    b_true[1]= b_1s[j]
-    b_true[2]= b_2s[j]
-    b_true[3]= b_3s[j]
+    b_true[1]= randn(1)[1] 
+    b_true[2]=randn(1)[1]
+    b_true[3]=randn(1)[1]
+    b_1s[j] = b_true[1]
+    b_2s[j] = b_true[2]
+    b_3s[j] = b_true[3]
+    
+    # b_true[1]= b_1s[j]
+    # b_true[2]= b_2s[j]
+    # b_true[3]= b_3s[j]
     # X=randn(n,p)
 
     g=rand(MvNormal(τ2*K))
     # writedlm("./testdata/dataX-julia.csv",X)
-    Y= logistic.(X*b_true+g) .>rand(n) #generating binary outcome
+    Y= logistic.(X1*b_true+g) .>rand(n) #generating binary outcome
     Y=convert(Vector{Float64},Y)
     # writedlm("./testdata/dataY-julia.csv",Y)
     # T, S = svdK(K;LOCO=false)
     # Xt, Xt₀, yt, init0 = initialization(Y,X,ones(n,1),T,S;tol=1e-4)     
     # res10 = susieGLMM(L,ones(p)/p,yt,Xt,Xt₀,S,init0;tol=1e-4)
     # @time res10 =susieGLMM(1,ones(p)/p,Y,X1,ones(n,1),T,S) 
-   t0= @elapsed res10=fineQTL_glmm(K,G,Y,X;LOCO=false)
+   t0= @elapsed res10=fineQTL_glmm(K,G,Y,X1;LOCO=false)
     res1=[res1;res10]; Tmm[j]=t0
 end
 

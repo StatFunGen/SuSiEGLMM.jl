@@ -104,7 +104,7 @@ function susieGLMM(L::Int64,Π::Vector{Float64},y::Vector{Float64},X::Matrix{Flo
     Xt, Xt₀, yt = rotate(y,X,X₀,T)   
     # #initialization :
     σ0 = 0.1*ones(L); 
-     τ0 = 0.0001  #rand(1)[1]; #arbitray
+     τ0 = 0.001  #rand(1)[1]; #arbitray
     β0 = glm(X₀,y,Binomial()) |> coef 
     ν0 =sum(repeat(Π,outer=(1,L)).*σ0',dims=2)[:,1] ; #ν²0
     ξ0 =sqrt.(getXy('N',Xt.^2.0,ν0)+ getXy('N',Xt₀,β0).^2+ τ0*S )
