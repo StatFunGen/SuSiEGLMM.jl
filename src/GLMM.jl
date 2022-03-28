@@ -5,10 +5,11 @@ include("VEM.jl")
 include("SuSiEGLM.jl")
 
 
-function init(yt::Vector{Float64},Xt₀::Matrix{Float64},S::Vector{Float64},β::Vector{Float64},ξ::Vector{Float64},τ²::Float64;tol=1e-4)
+function init(yt::Vector{Float64},Xt₀::Matrix{Float64},S::Vector{Float64},ξ::Vector{Float64},τ²::Float64;tol=1e-4)
    
       
-     res= emGLMM(yt,Xt₀,S,τ²,β,ξ;tol=tol)
+    #  res= emGLMM(yt,Xt₀,S,τ²,β,ξ;tol=tol)
+     res=emGLMM(yt,Xt₀,S,τ²,ξ,Σ₀;tol=tol)
     
     return res
         
@@ -65,10 +66,10 @@ function initialization(y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix
     #initialization
      τ0 = 0.0001 #rand(1)[1]; #arbitray
     # τ0=1.2   
-    β0 = glm(X₀,y,Binomial()) |> coef
+    # β0 = glm(X₀,y,Binomial()) |> coef
     ξ0 =sqrt.(getXy('N',Xt₀,β0).^2+ τ0*S)
 
-    init_est= init(yt,Xt₀,S,β0,ξ0,τ0;tol=tol)
+    init_est= init(yt,Xt₀,S,ξ0,τ0;tol=tol)
        
     return Xt, Xt₀, yt, init_est
 end
