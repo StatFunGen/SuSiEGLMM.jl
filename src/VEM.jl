@@ -282,7 +282,7 @@ function ELBO(ξ_new::Vector{Float64},β_new::Vector{Float64},τ2_new::Float64,g
    
     n=length(yt);
     ll= sum(log.(logistic.(ξ_new))- 0.5*ξ_new)+ yt'*(getXy('N',Xt₀,β_new)+ghat) #lik
-    gl = -0.5*(n*log(τ2_new)+ sum(log.(S)-log.(Vg))- 1.0) - sum(ghat2./S)/τ2_new # g
+    gl = -0.5*(n*log(τ2_new)+ sum(log.(S)-log.(Vg))- 1.0 +sum(ghat2./S)/τ2_new)# g
     
     return ll+gl
     
@@ -294,7 +294,7 @@ function ELBO(ξ_new::Vector{Float64},β_new::Vector{Float64},τ2_new::Float64,g
 
 n=length(yt);
 ll= sum(log.(logistic.(ξ_new))- 0.5*ξ_new)+ yt'*(getXy('N',Xt₀,β_new) + AB1 + ghat) #lik
-gl = -0.5*(n*log(τ2_new)+ sum(log.(S)-log.(Vg))- 1.0) - sum(ghat2./S)/τ2_new # g
+gl = -0.5*(n*log(τ2_new)+ sum(log.(S)-log.(Vg))- 1.0 - sum(ghat2./S)/τ2_new) # g
 
 return ll+gl
 
