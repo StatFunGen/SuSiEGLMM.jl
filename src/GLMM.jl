@@ -5,10 +5,11 @@ include("VEM.jl")
 include("SuSiEGLM.jl")
 
 
-function init(yt::Vector{Float64},Xt₀::Matrix{Float64},S::Vector{Float64},β::Vector{Float64},ξ::Vector{Float64},τ²::Float64;tol=1e-4)
+function init(yt::Vector{Float64},Xt₀::Matrix{Float64},S::Vector{Float64},ξ::Vector{Float64},τ²::Float64,Σ₀::Matrix{Float64};tol=1e-4)
    
       
-     res= emGLMM(yt,Xt₀,S,τ²,β,ξ;tol=tol)
+    #  res= emGLMM(yt,Xt₀,S,τ²,β,ξ;tol=tol)
+     res=emGLMM(yt,Xt₀,S,τ²,ξ,Σ₀;tol=tol)
     
     return res
         
@@ -63,12 +64,16 @@ function initialization(y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix
      Xt, Xt₀, yt = rotate(y,X,X₀,T)   
     #  y0= getXy('N',T,y) # rotate w/o centering for β0
     #initialization
-     τ0 = 0.0001 #rand(1)[1]; #arbitray
+     Σ0= 2*(cov(Xt₀)+I) # avoid sigularity when only with intercept
+     τ0 = 0.001 #rand(1)[1]; #arbitray
     # τ0=1.2   
-    β0 = glm(X₀,y,Binomial()) |> coef
-    ξ0 =sqrt.(getXy('N',Xt₀,β0).^2+ τ0*S)
+    # β0 = glm(X₀,y,Binomial()) |> coef
+    sig0=getXX('N',Σ0,'T',Xt₀)
+    β̂0=getXy('N',sig0,yt)
+    ξ0 =sqrt.(getXy('N',Xt₀,β̂0 ).^2+ Diagonal(getXX('N',Xt₀,'N',sig0).+τ0*S)*ones(n))
+    
 
-    init_est= init(yt,Xt₀,S,β0,ξ0,τ0;tol=tol)
+    init_est= init(yt,Xt₀,S,ξ0,τ0,Σ0;tol=tol)
        
     return Xt, Xt₀, yt, init_est
 end
@@ -125,7 +130,7 @@ end
 function computeT(init0::Null_est,yt::Vector{Float64},Xt₀::Matrix{Float64},Xt::Matrix{Float64})
     
         m=axes(Xt,2)
-        r₀ =  2*yt.*(getXy('N',Xt₀,init0.β)+init0.μ)  
+        r₀ =  2*yt.*(getXy('N',Xt₀,init0.β̂)+init0.μ)  
         p̂ = logistic.(r₀)
         Γ  = p̂.*(1.0.-p̂)
         # XX=Xt₀'Diagonal(Γ)
@@ -137,7 +142,7 @@ function computeT(init0::Null_est,yt::Vector{Float64},Xt₀::Matrix{Float64},Xt:
         
          ĝ = getXy('T',G̃,yt-p̂).^2
     
-           for j = m
+        @views for j = m
            
               Tstat[j] = ĝ[j]/(G̃[:,j]'*(Γ.*G̃[:,j]))
            end
