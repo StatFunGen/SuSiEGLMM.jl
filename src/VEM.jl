@@ -36,9 +36,9 @@ struct covAdj
  M::Matrix{Float64}
 end
 
-function covarAdj(Xy₀::Vector{Float4},yt::Vector{Float64},Xt₀::Matrix{Float64},Σ₀::Matrix{Float64},ξ::Vector{Float64},n::Int64)
+function covarAdj(Xy₀::Vector{Float64},yt::Vector{Float64},Xt₀::Matrix{Float64},Σ₀::Matrix{Float64},ξ::Vector{Float64},n::Int64)
     
-    c=size(Xt₀,2); beta=zeros(c); tD=copy(Xt₀'); C=zeros(n,c)
+    c=size(Xt₀,2); beta=zeros(c); tD=copy(Xt₀'); C=zeros(n,c); M=zeros(n,n)
     λ= Diagonal(Lambda.(ξ)) #2Lambda
 
     # Xy₀=getXy('T',Xt₀,yt) #X₀'y
@@ -86,14 +86,15 @@ end
 # for initial values (H0)
 function postG!(ghat::Vector{Float64},Vg::Matrix{Float64},Badj::covAdj,S::Vector{Float64},τ2::Float64)
     
-   
+    tDA=copy(Badj.tD) #c x n
+    B=copy(Badj.B)
     Ainv= inv(Badj.λ+ inv(Diagonal(τ2*S)))
 
-    tDA = getXX('N',Badj.tD,'N',Ainv)
-    
+    # tDA = getXX('N',Badj.tD,'N',Ainv)
+    rmul!(tDA,Ainv) 
     #posterior : S-M-W formula
-    Vg[:,:]= Ainv- getXX('N',Ainv,'N',Badj.B,)*((I+getXX('N',tDA,'N',Badj.B))\tDA)
-    
+    Vg[:,:]= Ainv- lmul!(Ainv,B)*((I+getXX('N',tDA,'N',Badj.B))\tDA)
+    # println("pdf of Vg is", isposdef(Vg))
     ghat[:]= getXy('N',Vg,Badj.Ŷ)
     
 end
@@ -106,8 +107,10 @@ function emG!(ghat2::Matrix{Float64},τ2_new::Vector{Float64}, Vg::Matrix{Float6
     # ghat2=zeros(n,n); τ2_new=zero(eltype(S)); 
     #e-step : update the second moment 
     ghat2[:,:] = Vg+ghat*ghat'
+  
     #m-step for τ²
-    τ2_new[:]= tr(ghat2./S)/n
+    τ2_new[:].= tr(ghat2./S)/n
+   
  
     # return ghat2, τ2_new
     
@@ -249,8 +252,8 @@ function mStep!(ξ_new::Vector{Float64},Vg::Matrix{Float64},
   
    
     
-    ξ_new[:]= sqrt((getXy('N',Xt₀,Badj.β̂)- getXy('N', Badj.M,ghat)+ ghat).^2 
-    + Diag(Badj.M*(inv(Badj.λ)-2Vg+getXX('N',Vg,'T',Badj.M))+Vg)*ones(n))
+    ξ_new[:]= sqrt.((getXy('N',Xt₀,Badj.β̂)- getXy('N', Badj.M,ghat)+ ghat).^2 
+    + Diagonal(Badj.M*(inv(Badj.λ)-2Vg+BLAS.symm('L','U',Vg,Badj.M))+Vg)*ones(n))
 
     # tidx =findall(temp.<0.0)
     # if (!isempty(tidx))
@@ -335,7 +338,9 @@ function ELBO(ξ_new::Vector{Float64},τ2_new::Vector{Float64},Badj::covAdj,ghat
     ll= sum(log.(logistic.(ξ_new))- 0.5*ξ_new+0.5*Lambda.(ξ_new).*ξ_new.^2)
        + Badj.Ŷ'*ghat -0.5*tr(getXX('N',Badj.Λ̂,'N',ghat2))
     lbeta= ELBO(Xy₀,Badj.β̂,Vβ̂inv,Σ₀)   
-    gl = -0.5*(n*log.(τ2_new)+ sum(log.(S)-log.(Vg))- 1.0 + tr(ghat2./S)/τ2_new[1]) # g
+    # println("τ2_new: $(τ2_new)")
+    
+    gl = -0.5*(n*log(τ2_new[1])+ sum(log.(S))-logdet(Vg)- 1.0 + tr(ghat2./S)/τ2_new[1]) # g
     
     return ll+gl+lbeta
     
@@ -444,6 +449,7 @@ end
 
 
 struct Null_est
+    β̂::Vector{Float64}
     ξ::Vector{Float64}
     μ::Vector{Float64}
     τ2::Float64
@@ -456,39 +462,37 @@ end
 function emGLMM(yt,Xt₀,S,τ2,ξ,Σ₀;tol::Float64=1e-4)
     
     
-    n = length(yt)
-    ghat =zeros(n); Vg = zeros(n);# λ = zeros(n)##
+    n,c=size(Xt₀)
+    ghat =zeros(n); Vg = zeros(n,n);# λ = zeros(n)##
     
-    ghat2=zeros(n,n); τ2_new=zeros(1); τ2 =[τ2]
-    ξ_new = zeros(n); 
+    ghat2=zeros(n,n); τ2_new=zeros(1); τ2 =[τ2]; 
+    ξ_new = zeros(n); βhat=zeros(c)
     
     Xy₀=getXy('T',Xt₀,yt) #X₀'y
-    Vβ̂inv,Badj = covarAdj(Xy₀,yt,Xt₀,Σ₀,ξ,n)
+    # Vβ̂inv,Badj = covarAdj(Xy₀,yt,Xt₀,Σ₀,ξ,n)
    
     crit =1.0; el0=0.0;numitr=1
       
     
     while (crit>=tol)
         ###check again!
-        
+         Vβ̂inv,Badj= covarAdj(Xy₀,yt,Xt₀,Σ₀,ξ,n) 
          postG!(ghat,Vg,Badj,S,τ2[1])
          emG!(ghat2,τ2_new,Vg,ghat,S,n)
          
          mStep!(ξ_new,Vg,ghat,Badj,Xt₀,n)
 
-         Vβ̂inv,Badj= covarAdj(Xy₀,yt,Xt₀,Σ₀,ξ_new,n) 
-    
          el1=ELBO(ξ_new,τ2_new,Badj,ghat,ghat2,Vg,S,Xy₀,Vβ̂inv,Σ₀,n)
      
          crit=abs(el1-el0)
         #  crit=norm(ξ_new-ξ)+norm(β_new-β)+abs(τ2_new-τ2)+abs(el1-el0)  
         
-         ξ=ξ_new; τ2=τ2_new;el0=el1
+         ξ=ξ_new; τ2=τ2_new;el0=el1;βhat=Badj.β̂
         
           numitr +=1        
     end
     println(numitr)
-    return Null_est(ξ,ghat,τ2,el0)
+    return Null_est(βhat,ξ,ghat,τ2[1],el0)
     
 end
 

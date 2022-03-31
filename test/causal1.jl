@@ -5,7 +5,7 @@
 
 @everywhere using Revise
 @everywhere using Pkg
-@everywhere Pkg.activate(homedir()*"/GIT/SuSiEGLMM.jl")
+@everywhere Pkg.activate(homedir()*"/GIT/susie-glmm/SuSiEGLMM.jl")
 @everywhere using SuSiEGLMM
 
 
@@ -51,14 +51,14 @@ X = convert(Matrix{Float64},X)
 n,p = size(X)
 # L=3; Π = ones(p)/p
 #score test
-@time Tstat, pval= SuSiEGLMM.scoreTest(K,G,y,X;LOCO=false);
+@time Tstat, pval= scoreTest(K,G,y,X;LOCO=false);
 
     T, S = svdK(K;LOCO=false)
     Xt, Xt₀, yt,init00= initialization(y,X,ones(n,1),T,S;tol=1e-4)
     T0= computeT(init00,yt,Xt₀,Xt)
 
 
-@time Tstat1, pval1= SuSiEGLMM.scoreTest(K1,G,y,X)
+@time Tstat1, pval1= scoreTest(K1,G,y,X)
 
 #susie-glm
 @time est0= fineQTL_glm(G,y,X;tol=1e-4)
@@ -96,53 +96,29 @@ p=size(X,2)
 ######## the same simulation in R-version
 Seed(124)
 
-
- L=1; B=100;τ2=0.4;
-#GLM
-b_true=zeros(p);
-b_1s=zeros(B);
-
-res=[];Tm=zeros(B);
-
-for j = 1:B
-    # b_true[1]= randn(1)[1] 
-    # b_1s[j] = b_true[1]
-    b_true[1]=b_1s[j]
-    X=randn(n,p)
-    g=rand(MvNormal(τ2*K)) 
-    Y= logistic.(X1*b_true+g) .>rand(n) #generating binary outcome
-    Y=convert(Vector{Float64},Y)
-    # writedlm("./testdata/dataY-julia.csv",Y)
-    # res0= susieGLM(L, ones(p)/p,Y,X,ones(n,1);tol=1e-4) 
-  t0=@elapsed  res0= fineQTL_glm(G,Y,X1;L=L,tol=1e-4)
-    res=[res;res0]; Tm[j]=t0
-end
-
-b̂ = [res[2j-1].α[1]*res[2j-1].ν[1] for j=1:B]
-α̂ = [res[2j-1].α[1] for j=1:B]
-writedlm("./test/glm-cau1.txt",[b̂ α̂ b_1s])
-println("min median max times for glm are $(minimum(Tm)),$(median(Tm)), $(maximum(Tm)).")
-
-using UnicodePlots
-scatterplot(b_1s,b̂,xlabel= "True effects", ylabel="Posterior estimate")
-scatterplot(b_1s,α̂, xlabel="True effects",ylabel="pip")
+X1= (X.-mean(X,dims=2))./std(X,dims=2)
+n,p = size(X1)
+ L=1; B=100;τ2=0.1;
 
 #GLMM :scroe test
 
-# n=100; p=10; 
-X1= (X.-mean(X,dims=2))./std(X,dims=2)
+# n=100; 
+# p=10; 
+
 # K2=Symmetric(K0)
 b_true=zeros(p);
 b_1s=zeros(B); 
 init0=[]; 
 Ps=zeros(p,B); Tscore=zeros(p,B);tt=zeros(B);
+#add covariates
+c=3
 
 
 # # F =cholesky(K2)
 # # f = svd(F.U)
 # # T,S = f.Vt, f.S.^2
 # K0=convert(Matrix{Float64},K0);
-T,S = svdK(K;LOCO=false)
+T,S = svdK(K0;LOCO=false)
 # # H=svd(K2);
 for j = 1:B
 
@@ -150,13 +126,18 @@ for j = 1:B
     b_1s[j] = b_true[1]
     # b_true[1]=b_1s[j]
     # X=randn(n,p)
-    g=rand(MvNormal(τ2*K0))
+    g=rand(MvNormal(τ2*K0)) #theoretical 
+    # g=rand(MvNormal(τ2*K0)) #grm
     # writedlm("./testdata/dataX-julia.csv",X)
-    Y= logistic.(X1*b_true+g) .>rand(n) #generating binary outcome
+    X₀=randn(n,c)
+    bhat=randn(c)
+    # Y= logistic.(X*b_true+g) .>rand(n) #generating binary outcome
+    # Y= logistic.(X1*b_true+g) .>rand(n)
+    Y= logistic.(X1*b_true+g+X₀*bhat) .>rand(n)
     Y=convert(Vector{Float64},Y)
     # writedlm("./testdata/dataY-julia.csv",Y)
-    
-    Xt, Xt₀, yt,init00= initialization(Y,X1,ones(n,1),T,S;tol=1e-4)
+    Xt, Xt₀, yt,init00= initialization(Y,X1,X₀,T,S;tol=1e-4)
+    # Xt, Xt₀, yt,init00= initialization(Y,X1,ones(n,1),T,S;tol=1e-4)
     T0= computeT(init00,yt,Xt₀,Xt)
     init0=[init0;init00]
     Tscore[:,j]=T0
@@ -167,7 +148,8 @@ end
 
 writedlm("./test/glmm-scoretest.txt",Ps)
 println("min, median, max times for score test are $(minimum(Tscore)),$(median(Tscore)), $(maximum(Tscore)).")
-# [init0[j].τ2 for j=1:B]
+[init0[j].τ2 for j=1:B]
+sum(Ps[1,:].<0.05)
 
 #susie-GLMM & glm
 
@@ -238,3 +220,31 @@ b̂1 = maximum(res0.α.*res0.ν;dims=2)
 
 
 
+#GLM
+b_true=zeros(p);
+b_1s=zeros(B);
+
+res=[];Tm=zeros(B);
+
+for j = 1:B
+    # b_true[1]= randn(1)[1] 
+    # b_1s[j] = b_true[1]
+    b_true[1]=b_1s[j]
+    X=randn(n,p)
+    g=rand(MvNormal(τ2*K)) 
+    Y= logistic.(X1*b_true+g) .>rand(n) #generating binary outcome
+    Y=convert(Vector{Float64},Y)
+    # writedlm("./testdata/dataY-julia.csv",Y)
+    # res0= susieGLM(L, ones(p)/p,Y,X,ones(n,1);tol=1e-4) 
+  t0=@elapsed  res0= fineQTL_glm(G,Y,X1;L=L,tol=1e-4)
+    res=[res;res0]; Tm[j]=t0
+end
+
+b̂ = [res[2j-1].α[1]*res[2j-1].ν[1] for j=1:B]
+α̂ = [res[2j-1].α[1] for j=1:B]
+writedlm("./test/glm-cau1.txt",[b̂ α̂ b_1s])
+println("min median max times for glm are $(minimum(Tm)),$(median(Tm)), $(maximum(Tm)).")
+
+using UnicodePlots
+scatterplot(b_1s,b̂,xlabel= "True effects", ylabel="Posterior estimate")
+scatterplot(b_1s,α̂, xlabel="True effects",ylabel="pip")
