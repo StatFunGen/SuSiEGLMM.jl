@@ -126,30 +126,61 @@ for j = 1:B
     b_1s[j] = b_true[1]
     # b_true[1]=b_1s[j]
     # X=randn(n,p)
-    g=rand(MvNormal(τ2*K0)) #theoretical 
-    # g=rand(MvNormal(τ2*K0)) #grm
+    # g=rand(MvNormal(τ2*K)) #theoretical 
+    g=rand(MvNormal(τ2*K0)) #grm
     # writedlm("./testdata/dataX-julia.csv",X)
     X₀=randn(n,c)
     bhat=randn(c)
     # Y= logistic.(X*b_true+g) .>rand(n) #generating binary outcome
     # Y= logistic.(X1*b_true+g) .>rand(n)
-    Y= logistic.(X1*b_true+g+X₀*bhat) .>rand(n)
+    Y= logistic.(X1*b_true+g+X₀*bhat) .>rand(n) # random covariates independent of X:95%
     Y=convert(Vector{Float64},Y)
     # writedlm("./testdata/dataY-julia.csv",Y)
-    Xt, Xt₀, yt,init00= initialization(Y,X1,X₀,T,S;tol=1e-4)
-    # Xt, Xt₀, yt,init00= initialization(Y,X1,ones(n,1),T,S;tol=1e-4)
-    T0= computeT(init00,yt,Xt₀,Xt)
+    t0=@elapsed begin
+        Xt, Xt₀, yt,init00= initialization(Y,X1,X₀,T,S;tol=1e-4)
+        # Xt, Xt₀, yt,init00= initialization(Y,X1,ones(n,1),T,S;tol=1e-4)
+        T0= computeT(init00,yt,Xt₀,Xt)
+    end
+   
     init0=[init0;init00]
     Tscore[:,j]=T0
     Ps[:,j]=ccdf.(Chisq(1),T0)
+    tt[j]=t0
 #    t0= @elapsed Ts,P0= scoreTest(K0,G,Y,X1;LOCO=false);
 #    Ps[:,j]=P0; tt[j]=t0; Tscore[:,j]=Ts
 end
 
 writedlm("./test/glmm-scoretest.txt",Ps)
-println("min, median, max times for score test are $(minimum(Tscore)),$(median(Tscore)), $(maximum(Tscore)).")
+println("min, median, max times for score test are $(minimum(tt)),$(median(tt)), $(maximum(tt)).")
 [init0[j].τ2 for j=1:B]
 sum(Ps[1,:].<0.05)
+
+# covariates correlated with X : 49%
+X2=copy(X1)
+for j = 1:B
+
+    b_true[1]= randn(1)[1] 
+    b_1s[j] = b_true[1]
+    # b_true[1]=b_1s[j]
+    # X=randn(n,p)
+    # g=rand(MvNormal(τ2*K)) #theoretical 
+    g=rand(MvNormal(τ2*K0)) #grm
+    # writedlm("./testdata/dataX-julia.csv",X)
+    bhat=randn(1)
+    X₀=rand(MvNormal([1 .9;.9 1]),n)
+    X2[:,1] = X₀[1,:]
+   
+    Y= logistic.(X1*b_true+g+X₀[2,:].*bhat) .>rand(n) 
+    Y=convert(Vector{Float64},Y)
+  
+    Xt, Xt₀, yt,init00= initialization(Y,X2,X₀[2,:],T,S;tol=1e-4)
+   
+    T0= computeT(init00,yt,Xt₀,Xt)
+    init0=[init0;init00]
+    Tscore[:,j]=T0
+    Ps[:,j]=ccdf.(Chisq(1),T0)
+
+end
 
 #susie-GLMM & glm
 
