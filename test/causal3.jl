@@ -171,7 +171,7 @@ g=rand(MvNormal(τ2*K0))
 Y= logistic.(X2*b_true+g) .>rand(n)
     # Y= logistic.(X1*b_true+g) .>rand(n) #generating binary outcome
 Y=convert(Vector{Float64},Y)
-@time begin
+t=@elapsed begin
     # Xt, Xt₀, yt,init00= initialization(Y,X1,ones(n,1),T,S;tol=1e-4)
     Xt, Xt₀, yt,init00= initialization(Y,X2,ones(n,1),T,S;tol=1e-4)
     Ts= computeT(init00,yt,Xt₀,Xt)

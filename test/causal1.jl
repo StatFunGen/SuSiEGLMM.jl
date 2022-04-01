@@ -12,7 +12,7 @@
 ### causal1:pop
 @time info=readdlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/causal1/pop/ascertained_pop_12_10.bim");
 @time geno=readdlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/causal1/pop/ascertained_pop_genotype_12_10.txt";header=true);
-@time pheno=readdlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/causal1/pop/ascertained_pop_phenotype_12_10.txt";header=true); #518 x 4000 snps
+@time pheno=readdlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/causal1/pop/ascertained_pop_phenotype_12_10.txt";header=true); #503 x 4000 snps
 #data1=readdlm("../testdata/fam_100fams_4000snps.txt";header=true)
 
 # covariate: sex
@@ -126,7 +126,7 @@ for j = 1:B
     b_1s[j] = b_true[1]
     # b_true[1]=b_1s[j]
     # X=randn(n,p)
-    # g=rand(MvNormal(τ2*K)) #theoretical 
+    # g=rand(MvNormal(τ2*K)) #theoretical 91% (intercept)
     g=rand(MvNormal(τ2*K0)) #grm
     # writedlm("./testdata/dataX-julia.csv",X)
     X₀=randn(n,c)
@@ -150,7 +150,7 @@ for j = 1:B
 #    Ps[:,j]=P0; tt[j]=t0; Tscore[:,j]=Ts
 end
 
-writedlm("./test/glmm-scoretest.txt",Ps)
+# writedlm("./test/glmm-scoretest.txt",Ps)
 println("min, median, max times for score test are $(minimum(tt)),$(median(tt)), $(maximum(tt)).")
 [init0[j].τ2 for j=1:B]
 sum(Ps[1,:].<0.05)
@@ -172,14 +172,15 @@ for j = 1:B
    
     Y= logistic.(X1*b_true+g+X₀[2,:].*bhat) .>rand(n) 
     Y=convert(Vector{Float64},Y)
-  
+    t0=@elapsed begin
     Xt, Xt₀, yt,init00= initialization(Y,X2,X₀[2,:],T,S;tol=1e-4)
    
     T0= computeT(init00,yt,Xt₀,Xt)
+    end
     init0=[init0;init00]
     Tscore[:,j]=T0
     Ps[:,j]=ccdf.(Chisq(1),T0)
-
+    tt[j]=t0
 end
 
 #susie-GLMM & glm
