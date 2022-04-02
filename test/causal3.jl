@@ -107,7 +107,7 @@ b_true=zeros(p);b_1s=zeros(B);b_2s=zeros(B); b_3s=zeros(B);
  init0=[]; 
 Ps=zeros(p,B); Tscore=zeros(p,B);tt=zeros(B);
 c=10;
-
+Y0= zeros(n,B);
 # F =cholesky(K2)
 # f = svd(F.U)
 # T,S = f.Vt, f.S.^2
@@ -130,13 +130,14 @@ for j = 1:B
     Y= logistic.(X1*b_true+g+X₀*bhat) .>rand(n)
     # Y= logistic.(X1*b_true+g) .>rand(n) #generating binary outcome
     Y=convert(Vector{Float64},Y)
+    # Y0[:,j]=Y
     # writedlm("./testdata/dataY-julia.csv",Y)
     t0=@elapsed begin
         # Xt, Xt₀, yt,init00= initialization(Y,X1,ones(n,1),T,S;tol=1e-4)
         Xt, Xt₀, yt,init00= initialization(Y,X1,X₀,T,S;tol=1e-4)
         Ts= computeT(init00,yt,Xt₀,Xt)
     end 
-    
+    # writedlm("./test/y_causal3_1_2_3_fam_grm.txt",Y0)
     init0=[init0;init00]
     Tscore[:,j]=Ts
     Ps[:,j]=ccdf.(Chisq(1),Ts)
@@ -149,8 +150,6 @@ end
 [sum(Ps[j,:].<0.05) for j=1:L] # 83 81 73% for theoretical, 97 97 85% for grm :intercept only
 # 96 95 86% for grm+random covariates (c=10) median= 1.230s 
 
-
-# writedlm("./test/glmm-scoretest.txt",Ps)
 println("min, median, max times for score test are $(minimum(tt)), $(median(tt)),$(maximum(tt)).")
 
 
@@ -177,7 +176,7 @@ t=@elapsed begin
     Ts= computeT(init00,yt,Xt₀,Xt)
 end 
 P=ccdf.(Chisq(1),Ts)
-# P[[2 3 306 782 1660]]
+P[[2 3 306 782 1660]]
 #  4.7232e-33  0.00382837  4.7232e-33  0.00382837  2.81394e-19
 
 #for thoeretical K

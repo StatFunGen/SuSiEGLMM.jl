@@ -253,7 +253,7 @@ function mStep!(ξ_new::Vector{Float64},Vg::Matrix{Float64},
    
     
     ξ_new[:]= sqrt.((getXy('N',Xt₀,Badj.β̂)- getXy('N', Badj.M,ghat)+ ghat).^2 
-    + Diagonal(Badj.M*(inv(Badj.λ)-2Vg+BLAS.symm('L','U',Vg,Badj.M))+Vg)*ones(n))
+    + Diagonal(Badj.M*(inv(Badj.λ)-2Vg+BLAS.symm('R','U',Vg,Badj.M)')+Vg)*ones(n))
 
     # tidx =findall(temp.<0.0)
     # if (!isempty(tidx))

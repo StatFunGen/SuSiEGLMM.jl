@@ -113,7 +113,7 @@ Ps=zeros(p,B); Tscore=zeros(p,B);tt=zeros(B);
 #add covariates
 c=3
 
-
+Y0=zeros(n,B);
 # # F =cholesky(K2)
 # # f = svd(F.U)
 # # T,S = f.Vt, f.S.^2
@@ -129,16 +129,17 @@ for j = 1:B
     # g=rand(MvNormal(τ2*K)) #theoretical 91% (intercept)
     g=rand(MvNormal(τ2*K0)) #grm
     # writedlm("./testdata/dataX-julia.csv",X)
-    X₀=randn(n,c)
-    bhat=randn(c)
+    # X₀=randn(n,c)
+    # bhat=randn(c)
     # Y= logistic.(X*b_true+g) .>rand(n) #generating binary outcome
-    # Y= logistic.(X1*b_true+g) .>rand(n)
-    Y= logistic.(X1*b_true+g+X₀*bhat) .>rand(n) # random covariates independent of X:95%
+    Y= logistic.(X1*b_true+g) .>rand(n)
+    # Y= logistic.(X1*b_true+g+X₀*bhat) .>rand(n) # random covariates independent of X:95%
     Y=convert(Vector{Float64},Y)
     # writedlm("./testdata/dataY-julia.csv",Y)
+    # Y0[:,j]=Y
     t0=@elapsed begin
-        Xt, Xt₀, yt,init00= initialization(Y,X1,X₀,T,S;tol=1e-4)
-        # Xt, Xt₀, yt,init00= initialization(Y,X1,ones(n,1),T,S;tol=1e-4)
+        # Xt, Xt₀, yt,init00= initialization(Y,X1,X₀,T,S;tol=1e-4)
+        Xt, Xt₀, yt,init00= initialization(Y,X1,ones(n,1),T,S;tol=1e-4)
         T0= computeT(init00,yt,Xt₀,Xt)
     end
    
@@ -150,7 +151,8 @@ for j = 1:B
 #    Ps[:,j]=P0; tt[j]=t0; Tscore[:,j]=Ts
 end
 
-# writedlm("./test/glmm-scoretest.txt",Ps)
+writedlm("./test/y_causal1_1_pop_grm.txt",Y0)
+
 println("min, median, max times for score test are $(minimum(tt)),$(median(tt)), $(maximum(tt)).")
 [init0[j].τ2 for j=1:B]
 sum(Ps[1,:].<0.05)
