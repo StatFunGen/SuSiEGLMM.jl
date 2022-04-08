@@ -253,7 +253,7 @@ function mStep!(ξ_new::Vector{Float64},Vg::Matrix{Float64},
    
     
     ξ_new[:]= sqrt.((getXy('N',Xt₀,Badj.β̂)- getXy('N', Badj.M,ghat)+ ghat).^2 
-    + Diagonal(Badj.M*(inv(Badj.λ)-2Vg+BLAS.symm('L','U',Vg,Badj.M))+Vg)*ones(n))
+    + Diagonal(Badj.M*(inv(Badj.λ)-2Vg+BLAS.symm('R','U',Vg,Badj.M)')+Vg)*ones(n))
 
     # tidx =findall(temp.<0.0)
     # if (!isempty(tidx))
@@ -334,14 +334,17 @@ function ELBO(ξ_new::Vector{Float64},τ2_new::Vector{Float64},Badj::covAdj,ghat
         ghat2::Matrix{Float64},Vg::Matrix{Float64},S::Vector{Float64},
         Xy₀::Vector{Float64},Vβ̂inv::Matrix{Float64},Σ₀::Matrix{Float64},n::Int64)
    
-   
+       
     ll= sum(log.(logistic.(ξ_new))- 0.5*ξ_new+0.5*Lambda.(ξ_new).*ξ_new.^2)
        + Badj.Ŷ'*ghat -0.5*tr(getXX('N',Badj.Λ̂,'N',ghat2))
     lbeta= ELBO(Xy₀,Badj.β̂,Vβ̂inv,Σ₀)   
     # println("τ2_new: $(τ2_new)")
     
     gl = -0.5*(n*log(τ2_new[1])+ sum(log.(S))-logdet(Vg)- 1.0 + tr(ghat2./S)/τ2_new[1]) # g
-    
+    f=open("./test/elbo_components.txt","a")
+    writedlm(f,[ll lbeta gl])
+    close(f)
+
     return ll+gl+lbeta
     
 end
@@ -472,8 +475,8 @@ function emGLMM(yt,Xt₀,S,τ2,ξ,Σ₀;tol::Float64=1e-4)
     # Vβ̂inv,Badj = covarAdj(Xy₀,yt,Xt₀,Σ₀,ξ,n)
    
     crit =1.0; el0=0.0;numitr=1
-      
-    
+    open("./test/elbo_components.txt","w") 
+    #  open("./test/decELBO.txt","w")
     while (crit>=tol)
         ###check again!
          Vβ̂inv,Badj= covarAdj(Xy₀,yt,Xt₀,Σ₀,ξ,n) 
@@ -484,8 +487,13 @@ function emGLMM(yt,Xt₀,S,τ2,ξ,Σ₀;tol::Float64=1e-4)
 
          el1=ELBO(ξ_new,τ2_new,Badj,ghat,ghat2,Vg,S,Xy₀,Vβ̂inv,Σ₀,n)
      
+        #  if(el0>el1)
+        #   f=open("./test/decELBO.txt","a")
+            # writedlm(f,[numitr τ2_new el1 el1-el0])
+        #   close(f)
+        #  end
          crit=abs(el1-el0)
-        #  crit=norm(ξ_new-ξ)+norm(β_new-β)+abs(τ2_new-τ2)+abs(el1-el0)  
+        #  crit=norm(ξ_new-ξ)+norm(τ2_new-τ2)+abs(el1-el0)  
         
          ξ=ξ_new; τ2=τ2_new;el0=el1;βhat=Badj.β̂
         
@@ -524,7 +532,7 @@ function emGLM(L::Int64,y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float
     
     crit =1.0; el0=0.0;numitr=1
      
-    
+    open("./test/elbo_glm.txt","w")
     while (crit>=tol)
         ###check again!
         λ= Lambda.(ξ) 
@@ -547,6 +555,9 @@ function emGLM(L::Int64,y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float
         
          el1=ELBO(L,ξ_new,β_new,σ0_new,A1,B1,AB2,Sig1,Π,y,X,X₀)
         #  println("elbo = $(el1)")
+         f= open("./test/elbo_glm.txt","a")
+         writedlm(f,[numitr σ0_new el1 el1-el0])
+         close(f)
      
          crit=abs(el1-el0)
          #check later for performance
@@ -558,7 +569,7 @@ function emGLM(L::Int64,y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float
         
         
     end
-    
+    println(numitr)
     return ResGLM(ξ,β,σ0,el0,A1, B1, Sig1)
         
 end
