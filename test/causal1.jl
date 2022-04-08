@@ -174,7 +174,9 @@ sum(Ps[1,:].<0.05)
 println("min, median, max times for score test are $(minimum(tt)),$(median(tt)), $(maximum(tt)).")
 println("min median max times for glm are $(minimum(Tm)),$(median(Tm)), $(maximum(Tm)).")
 
-
+#test glm
+Y= readdlm("./testdata/causal1_pop_Y.csv",',';skipstart=1)[:,1]
+res0= susieGLM(L, ones(p)/p,Y,X1,ones(n,1);tol=1e-3) 
 
 #susie-GLMM & glm
 #GLM
