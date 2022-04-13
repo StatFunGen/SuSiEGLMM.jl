@@ -93,7 +93,7 @@ function postG!(ghat::Vector{Float64},Vg::Matrix{Float64},Badj::covAdj,S::Vector
     # tDA = getXX('N',Badj.tD,'N',Ainv)
     rmul!(tDA,Ainv) 
     #posterior : S-M-W formula
-    Vg[:,:]= Ainv- lmul!(Ainv,B)*((I+getXX('N',tDA,'N',Badj.B))\tDA)
+    Vg[:,:]= Ainv+lmul!(Ainv,B)*((I-getXX('N',tDA,'N',Badj.B))\tDA)
     # println("pdf of Vg is", isposdef(Vg))
     ghat[:]= getXy('N',Vg,Badj.Ŷ)
     
@@ -342,7 +342,7 @@ function ELBO(ξ_new::Vector{Float64},τ2_new::Vector{Float64},Badj::covAdj,ghat
     
     gl = -0.5*(n*log(τ2_new[1])+ sum(log.(S))-logdet(Vg)- 1.0 + tr(ghat2./S)/τ2_new[1]) # g
     f=open("./test/elbo_components.txt","a")
-    writedlm(f,[ll lbeta gl])
+    writedlm(f,[ll lbeta gl ll+gl+lbeta])
     close(f)
 
     return ll+gl+lbeta
@@ -476,7 +476,7 @@ function emGLMM(yt,Xt₀,S,τ2,ξ,Σ₀;tol::Float64=1e-4)
    
     crit =1.0; el0=0.0;numitr=1
     open("./test/elbo_components.txt","w") 
-    #  open("./test/decELBO.txt","w")
+     open("./test/decELBO.txt","w")
     while (crit>=tol)
         ###check again!
          Vβ̂inv,Badj= covarAdj(Xy₀,yt,Xt₀,Σ₀,ξ,n) 
@@ -487,11 +487,11 @@ function emGLMM(yt,Xt₀,S,τ2,ξ,Σ₀;tol::Float64=1e-4)
 
          el1=ELBO(ξ_new,τ2_new,Badj,ghat,ghat2,Vg,S,Xy₀,Vβ̂inv,Σ₀,n)
      
-        #  if(el0>el1)
-        #   f=open("./test/decELBO.txt","a")
-            # writedlm(f,[numitr τ2_new el1 el1-el0])
-        #   close(f)
-        #  end
+         if(el0>el1)
+          f=open("./test/decELBO.txt","a")
+            writedlm(f,[numitr τ2_new el1 el1-el0])
+          close(f)
+         end
          crit=abs(el1-el0)
         #  crit=norm(ξ_new-ξ)+norm(τ2_new-τ2)+abs(el1-el0)  
         
