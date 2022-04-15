@@ -65,7 +65,7 @@ function initialization(y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix
     #  y0= getXy('N',T,y) # rotate w/o centering for β0
     #initialization
      Σ0= 2(cov(Xt₀)+I) # avoid sigularity when only with intercept
-     τ0 = 0.01 #rand(1)[1]; #arbitray
+     τ0 = 0.1 #rand(1)[1]; #arbitray
     # τ0=1.2   
     # β0 = glm(X₀,y,Binomial()) |> coef
     sig0=getXX('N',Σ0,'T',Xt₀)

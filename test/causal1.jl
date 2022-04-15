@@ -108,50 +108,52 @@ n,p = size(X1)
 # K2=Symmetric(K0)
 b_true=zeros(p);
 b_1s=zeros(B); 
-init0=[]; 
-# Tscore=zeros(p,B);tt=zeros(B); Ps=zeros(p,B); 
- Tscore1=zeros(p,B);#Ps1=zeros(p,B);
+init0=[]; init1=[]
+Ts=zeros(p,B);
+# tt=zeros(B); Ps=zeros(p,B); 
+ Ts1=zeros(p,B);#Ps1=zeros(p,B);
 
 res=[]
 #add covariates
 # c=3
 
-# Y0=zeros(n,B);
-K=Matrix(1.0I,n,n)
-T,S = svdK(K;LOCO=false)
-# T,S = svdK(K0;LOCO=false)
+Y0=zeros(n,B);
+# K=Matrix(1.0I,n,n)
+# T,S = svdK(K;LOCO=false)
+T,S = svdK(K0;LOCO=false)
 # # H=svd(K2);
 
 for j = 1:B
     b_true[1]= randn(1)[1] 
     b_1s[j] = b_true[1]   
     # b_true[1]=b_1s[j]
-    X=randn(n,p)
-    g=rand(MvNormal(τ2*K)) #theoretical
+    # X=randn(n,p)
+    g=rand(MvNormal(τ2*K0)) #theoretical
     # g=rand(MvNormal(τ2*K0)) #grm
     # writedlm("./testdata/dataX-julia.csv",X)
     # X₀=randn(n,c)
     # bhat=randn(c)
     # Y= logistic.(X*b_true+g) .>rand(n) #generating binary outcome
 
-    # Y= logistic.(g) .>rand(n)
-    Y1=logistic.(X*b_true+g) .>rand(n)
+    Y= logistic.(g) .>rand(n)
+    Y1=logistic.(X1*b_true+g) .>rand(n)
     # Y= logistic.(X1*b_true+g+X₀*bhat) .>rand(n) # random covariates independent of X:95%
-    # Y=convert(Vector{Float64},Y)
+    Y=convert(Vector{Float64},Y)
     Y1=convert(Vector{Float64},Y1) 
     # writedlm("./testdata/dataY-julia.csv",Y)
-    # Y0[:,j]=Y
+    Y0[:,j]=Y1
     
     t0=@elapsed begin
         # Xt, Xt₀, yt,init00= initialization(Y,X1,X₀,T,S;tol=1e-4)
-        # Xt, Xt₀, yt,init00= initialization(Y,X1,ones(n,1),T,S;tol=1e-4)
-        # T0= computeT(init00,yt,Xt₀,Xt)
-        Xt, Xt₀, yt,init00= initialization(Y1,X,ones(n,1),T,S;tol=1e-4)
-        T1= computeT(init00,yt,Xt₀,Xt)
+        Xt, Xt₀, yt,init00= initialization(Y,X1,ones(n,1),T,S;tol=1e-4)
+        T0= computeT(init00,yt,Xt₀,Xt)
+        # Xt, Xt₀, yt,init01= initialization(Y1,X1,ones(n,1),T,S;tol=1e-3)
+        # T1= computeT(init01,yt,Xt₀,Xt)
     end
     init0=[init0;init00]
-    # Tscore[:,j]=T0;
-    Tscore1[:,j]=T1
+    # init1=[init1;init01]
+    Ts[:,j]=T0;
+    # Ts1[:,j]=T1
     # # Ps[:,j]=ccdf.(Chisq(1),T0); Ps1[:,j]=ccdf.(Chisq(1),T1)
     # tt[j]=t0
     # #glm
@@ -164,7 +166,16 @@ for j = 1:B
 #    Ps[:,j]=P0; tt[j]=t0; Tscore[:,j]=Ts
 end
 
-writedlm("./test/y_causal1_1_pop_grm.txt",Y0)
+# writedlm("./test/y_causal1_1_pop_grm.txt",Y0)
+for j=1:B
+    Xt, Xt₀, yt,init01= initialization(Y0[:,j],X1,ones(n,1),T,S;tol=1e-4)
+    T1= computeT(init01,yt,Xt₀,Xt)
+    # Xt, Xt₀, yt,init01= initialization(Y1,X1,ones(n,1),T,S;tol=1e-3)
+    # T1= computeT(init01,yt,Xt₀,Xt)
+     init1=[init1;init01]
+# init1=[init1;init01]
+      Ts1[:,j]=T1;
+end
 
 [init0[j].τ2 for j=1:B]
 tα=percentile(maximum(Tscore,dims=1)[1,:],95)
