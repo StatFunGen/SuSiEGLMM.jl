@@ -45,12 +45,14 @@ function covarAdj(Xy₀::Vector{Float64},yt::Vector{Float64},Xt₀::Matrix{Float
     
     
    
-    Vβ̂inv= inv(Σ₀)+ BLAS.gemm('N','N',rmul!(tD,λ),Xt₀)  # Σ₀^-₁ +(tD=X₀'*λ)*X₀ :precision Σᵦ
+    # Vβ̂inv= inv(Σ₀)+ BLAS.gemm('N','N',rmul!(tD,λ),Xt₀)  # Σ₀^-₁ +(tD=X₀'*λ)*X₀ :precision Σᵦ
+    Vβ̂inv= inv(Σ₀)+ symXX('N',rmul!(tD,sqrt.(λ))) #forcing to be symmetric
+    rmul!(tD,sqrt.(λ))
     intB!(beta,M,C, Vβ̂inv,Xy₀,tD,Xt₀)
    
     # llbeta= 0.5(Xy₀'*beta - logdet(Vβ̂inv)-logdet(Σ₀))# β̂'inv(Σᵦ)β̂ for elbo 
     Ŷ= yt- getXy('T',tD,beta)      # yt - λX₀β̂
-    Λ̂ = λ- getXX('N',C,'N',tD) #λ- λX₀ΣᵦX₀'λ
+    Λ̂ = λ- Symmetric(getXX('N',C,'N',tD)) #λ- λX₀ΣᵦX₀'λ
     
 
      return  Vβ̂inv, covAdj(beta,Ŷ,Λ̂,λ,C,tD,M)
@@ -160,7 +162,7 @@ function emB(A1::Matrix{Float64}, B1::Matrix{Float64}, Sig1::Matrix{Float64},L::
        
     σ0_new = zeros(L); AB2=zeros(axes(B1));
        # compute the second moment of b_l & update the hyper-parameter σ0
-        for l= 1:L
+       @fastmath @inbounds @views for l= 1:L
         AB2[:,l]= A1[:,l].*(B1[:,l].^2+ Sig1[:,l])    
         σ0_new[l]= sum(AB2[:,l]) 
         end
@@ -297,7 +299,8 @@ function mStep!(ξ_new::Vector{Float64},β_new::Vector{Float64},A1::Matrix{Float
 #     println(a)
 #     display(ξ_new[a])
   
- β_new[:]= getXX('T',X₀,'N',(λ.*X₀))\getXy('T',X₀,(y- λ.*B2))
+#  β_new[:]= getXX('T',X₀,'N',(λ.*X₀))\getXy('T',X₀,(y- λ.*B2))
+    β_new[:]= symXX('T',(Diagonal(sqrt.(λ))*X₀))\getXy('T',X₀,(y- λ.*B2))
     
 end
 
@@ -373,15 +376,15 @@ function ELBO(L::Int64,ξ_new::Vector{Float64},β_new::Vector{Float64},σ0_new::
 
  ll= sum(log.(logistic.(ξ_new))- 0.5*ξ_new)+ y'*(getXy('N',X₀,β_new)+ getXy('N',X,sum(A1.*B1,dims=2)[:,1])) #lik
  # susie part
- for l= 1: L 
+ @fastmath @inbounds @views for l= 1: L 
     if(sum(A1[:,l].==0.0)>0) #avoid NaN by log(0)
         lnb[l] = 0.0
     else
-        lnb[l]  = A1[:,l]'*(log.(A1[:,l])-log.(Π) - 0.5*log.(Sig1[:,l]))
+        lnb[l]  = A1[:,l]'*(log.(A1[:,l])-log.(Π)- 0.5*log.(Sig1[:,l]))+0.5*sum(AB2[:,l])/σ0_new[l]
     end
 end
            
-bl= sum(lnb)  +0.5*(sum(log.(σ0_new))- L)+ 0.5*sum(sum(AB2,dims=1)'./σ0_new)
+bl= sum(lnb)  +0.5*(sum(log.(σ0_new))- L)
      
 return ll-bl
         
@@ -520,7 +523,7 @@ end
 
 # EM for GLM
 function emGLM(L::Int64,y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float64},
-        β::Vector{Float64},ξ::Vector{Float64},σ0::Vector{Float64},Π::Vector{Float64};tol::Float64=1e-5)
+        β::Vector{Float64},ξ::Vector{Float64},σ0::Vector{Float64},Π::Vector{Float64};tol::Float64=1e-3,maxitr=1000)
     
     n, p = size(X)
     λ = zeros(n)##
@@ -530,10 +533,10 @@ function emGLM(L::Int64,y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float
     A1 =copy(A0); B1=copy(B0); Sig1=zeros(p,L)
     σ0_new = zeros(L); ξ_new = zeros(n); β_new=zeros(axes(β))
     
-    crit =1.0; el0=0.0;numitr=1
+    crit =1.0; el0=0.0;numitr=1;
      
     open("./test/elbo_glm.txt","w")
-    while (crit>=tol)
+    while ((crit>=tol) && (numitr<= maxitr))
         ###check again!
         λ= Lambda.(ξ) 
         # println("inter=$(numitr) and λ:")
