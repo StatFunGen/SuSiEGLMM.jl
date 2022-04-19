@@ -206,7 +206,7 @@ for j = 1:B
     Y= logistic.(X*b_true) .>rand(n) #generating binary outcome
     Y=convert(Vector{Float64},Y)
     writedlm("./testdata/dataY-julia.csv",Y)
-    res0= susieGLM(L, ones(p)/p,Y,X,ones(n,1);tol=1e-3) 
+    res0= susieGLM(n,L, ones(p)/p,Y,X,ones(n,1);tol=1e-3) 
 #   t0=@elapsed  res0= fineQTL_glm(G,Y,X1;L=L,tol=1e-4)
     res=[res;res0]; #Tm[j]=t0
     
