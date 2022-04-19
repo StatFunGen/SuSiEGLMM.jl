@@ -13,7 +13,7 @@
 
 
 
-export covarAdj, postG!, emG, postB!,emB,mStep!,ELBO,emGLMM,emGLM, Result, Null_est, ResGLM
+export covarAdj, postG!, emG!, postB!,emB,mStep!,ELBO,emGLMM,emGLM, Result, Null_est, ResGLM
 
 
 function intB!(beta::Vector{Float64},M::Matrix{Float64},C::Matrix{Float64},
@@ -72,11 +72,9 @@ end
 #g for a full model
 function postG!(ghat::Vector{Float64},Vg::Vector{Float64},λ::Vector{Float64},
 yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{Float64},S::Vector{Float64},
-        β::Vector{Float64},ξ::Vector{Float64},τ2::Float64,A0::Matrix{Float64},B0::Matrix{Float64})
+        β::Vector{Float64},τ2::Float64,A0::Matrix{Float64},B0::Matrix{Float64})
     
     
-    λ[:]= Lambda.(ξ)
-   
     #posterior
     Vg[:]= 1.0./(λ+1.0./(τ2*S))
     
@@ -113,9 +111,7 @@ function emG!(ghat2::Matrix{Float64},τ2_new::Vector{Float64}, Vg::Matrix{Float6
     #m-step for τ²
     τ2_new[:].= tr(ghat2./S)/n
    
- 
-    # return ghat2, τ2_new
-    
+    # return ghat2, τ2_new   
 end
 
 
@@ -136,8 +132,6 @@ yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{Float64},β::Vector{Float6
     ϕ= getXy('T', Xt.^2,λ) # mle of precision
     AB0= A0.*B0;  # #old α_l*b_l
     
-   
-
             Sig1[:,:] =  1.0./(1.0./σ0'.+ ϕ)
     
      for l= 1: L
@@ -197,9 +191,7 @@ function postB!(A1::Matrix{Float64}, B1::Matrix{Float64}, Sig1::Matrix{Float64},
                 Z =  getXy('T',X,Z0)
              
                 B1[:,l] = Diagonal(Sig1[:,l])*Z #posterior b_l
-                  # compute α_1
-                # A1[:,l] = exp.(log.(Π)-0.5*(Z.^2)./(1.0.+ϕ./σ0[l]) +0.5*log.(σ0[l]*ϕ.^(-1).+1))
-            
+                  # compute α_l
                 A1[:,l] = log.(Π)+ 0.5*Z.^2 .*Sig1[:,l] + 0.5*log.(Sig1[:,l]) 
                 A1[:,l] = exp.(A1[:,l].-maximum(A1[:,l])) # eliminate max for numerical stability
                 A1[:,l] = A1[:,l]/sum(A1[:,l]) # scale to 0< α_1<1
@@ -212,9 +204,8 @@ end
 
 
 # M-step: H1
-function mStep!(ξ_new::Vector{Float64},β_new::Vector{Float64},A1::Matrix{Float64},B1::Matrix{Float64},AB2::Matrix{Float64},
-        ghat::Vector{Float64},ghat2::Vector{Float64},λ::Vector{Float64},
-        yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{Float64},β::Vector{Float64},L::Int64)
+function mStep!(ξ_new::Vector{Float64},A1::Matrix{Float64},B1::Matrix{Float64},AB2::Matrix{Float64},ghat::Vector{Float64},
+    ghat2::Vector{Float64},yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{Float64},β::Vector{Float64},L::Int64)
     
     # ξ_new= zeros(axes(yt))
     # β_new= zeros(axes(Xt₀,2))
@@ -223,7 +214,7 @@ function mStep!(ξ_new::Vector{Float64},β_new::Vector{Float64},A1::Matrix{Float
       AB= getXX('N',Xt,'N',A1.*B1)
       B2= sum(AB,dims=2)[:,1]
       
-      ξ_new[:] = getXy('N',Xt.^2.0,(sum(AB2,dims=2))[:,1]) # E(Xb)^2
+      ξ_new[:] = getXy('N',Xt.^2.0,sum(AB2,dims=2)[:,1]) # E(Xb)^2
 
       for j in eachindex(yt)
          U= AB[j,:]*AB[j,:]'
@@ -237,16 +228,22 @@ function mStep!(ξ_new::Vector{Float64},β_new::Vector{Float64},A1::Matrix{Float
         writedlm("./test/err-b.txt",[AB B2])
         writedlm("./test/domain-err-h1.txt",[repeat([myid()],length(tidx)) tidx temp[tidx] ξ_new[tidx] ghat2[tidx] ghat[tidx] ŷ₀[tidx] ((ŷ₀ +ghat).*B2)[tidx] ])
     #    temp[tidx].= 0.000001
-       temp.= 0.00001
+    #    temp.= 0.00001
     end
     # ξ_new[:] = sqrt.(ξ_new + ŷ₀.^2 + ghat2 + 2(ŷ₀ +ghat).*B2+ 2(ŷ₀.*ghat))
       ξ_new[:] = sqrt.(temp)
         
-    # β_new[:]= symXX('T',sqrt.(λ).*Xt₀)\getXy('T',Xt₀,(yt- λ.*(AB + ghat)))
-     β_new[:]= getXX('T',Xt₀,'N',(λ.*Xt₀))\getXy('T',Xt₀,(yt- λ.*(B2 + ghat)))
-        
+   
 end
 
+function updateβ!(β_new::Vector{Float64},λ::Vector{Float64},A0::Matrix{Float64},B0::Matrix{Float64},ghat::Vector{Float64},
+    yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{Float64})
+    
+    AB= getXX('N',Xt,'N',A0.*B0)
+    β_new[:]= symXX('T',(Diagonal(sqrt.(λ))*X₀))\getXy('T',Xt₀,(yt- λ.*(sum(AB,dims=2)[:,1]+ghat)))
+  
+    #  β_new[:]= getXX('T',Xt₀,'N',(λ.*Xt₀))\getXy('T',Xt₀,(yt- λ.*(B2 + ghat)))
+end
 
 #M-step: H0 for initial values
 function mStep!(ξ_new::Vector{Float64},Vg::Matrix{Float64},
@@ -272,9 +269,9 @@ function mStep!(ξ_new::Vector{Float64},Vg::Matrix{Float64},
             
 end
 
-# M-step for GLM
-function mStep!(ξ_new::Vector{Float64},β_new::Vector{Float64},A1::Matrix{Float64},B1::Matrix{Float64},AB2::Matrix{Float64},
-    λ::Vector{Float64},y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float64},β::Vector{Float64},L::Int64;nitr=0)
+# M-steps for GLM
+function mStep!(ξ_new::Vector{Float64},A1::Matrix{Float64},B1::Matrix{Float64},AB2::Matrix{Float64},
+    y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float64},β::Vector{Float64},L::Int64;nitr=0)
 
 # ξ_new= zeros(axes(yt))
 # β_new= zeros(axes(Xt₀,2))
@@ -290,18 +287,21 @@ function mStep!(ξ_new::Vector{Float64},β_new::Vector{Float64},A1::Matrix{Float
         ξ_new[j] = ξ_new[j]+ sum(U)-tr(U)
     end
 
-    
-
-    
    ξ_new[:] = sqrt.(ξ_new + ŷ₀.^2  + 2(ŷ₀.*B2))
 #    a=findall(ξ_new.<0.0) 
 #     println("ξ_new at $(nitr) iteration")
 #     println(a)
 #     display(ξ_new[a])
   
-#  β_new[:]= getXX('T',X₀,'N',(λ.*X₀))\getXy('T',X₀,(y- λ.*B2))
-    β_new[:]= symXX('T',(Diagonal(sqrt.(λ))*X₀))\getXy('T',X₀,(y- λ.*B2))
-    
+end
+
+function updateβ!(β_new::Vector{Float64},λ::Vector{Float64},A0::Matrix{Float64},B0::Matrix{Float64},
+    y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float64})
+
+        AB = getXX('N',X,'N',A0.*B0) # nxL
+        # B2= sum(AB,dims=2)[:,1]
+        β_new[:]= symXX('T',(Diagonal(sqrt.(λ))*X₀))\getXy('T',X₀,(y- λ.*sum(AB,dims=2)[:,1]))
+
 end
 
 
@@ -385,7 +385,9 @@ function ELBO(L::Int64,ξ_new::Vector{Float64},β_new::Vector{Float64},σ0_new::
 end
            
 bl= sum(lnb)  +0.5*(sum(log.(σ0_new))- L)
-     
+     f=open("./test/glm_elbo.txt","a")
+      writedlm(f,[ll bl ll-bl])
+     close(f)
 return ll-bl
         
 end
@@ -407,7 +409,7 @@ end
 
 # EM for a full model
 function emGLMM(L::Int64,yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{Float64},S::Vector{Float64},τ2::Float64,
-        β::Vector{Float64},ξ::Vector{Float64},σ0::Vector{Float64},Π::Vector{Float64};tol::Float64=1e-4)
+        ξ::Vector{Float64},σ0::Vector{Float64},Π::Vector{Float64};tol::Float64=1e-4)
     
     n, p = size(Xt)
     ghat =zeros(n); Vg = zeros(n); λ = zeros(n)##
@@ -415,22 +417,24 @@ function emGLMM(L::Int64,yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{F
     B0=zeros(p,L); AB2=zeros(p,L)
    
     A1 =copy(A0); B1=copy(B0); Sig1=zeros(p,L)
-    ghat2=zeros(axes(S)); τ2_new=zero(eltype(S)); 
-    σ0_new = zeros(L); ξ_new = zeros(n); β_new=zeros(axes(β))
+    ghat2=zeros(axes(S)); τ2_new=zeros(1);
+    σ0_new = zeros(L); ξ_new = zeros(n); β_new=zeros(sizze(Xt₀,2))
     
     crit =1.0; el0=0.0;numitr=1
       
     
     while (crit>=tol)
         ###check again!
-         postG!(ghat,Vg,λ,yt,Xt,Xt₀,S,β,ξ,τ2,A0,B0)
-         ghat2, τ2_new = emG(Vg,ghat,S)
-         postB!(A1, B1, Sig1, λ,ghat,yt,Xt,Xt₀,β,σ0,A0,B0,Π,L)
+         λ[:]= Lambda.(ξ)
+         updateβ!(β_new,λ,A0,B0,ghat,yt,Xt,Xt₀)
+         postG!(ghat,Vg,λ,yt,Xt,Xt₀,S,β_new,τ2,A0,B0)
+         emG!(ghat2,τ2_new,Vg,ghat,S,n)
+         postB!(A1, B1, Sig1, λ,ghat,yt,Xt,Xt₀,β_new,σ0,A0,B0,Π,L)
          σ0_new, AB2 = emB(A1, B1, Sig1,L)
          
-         mStep!(ξ_new,β_new,A1,B1,AB2,ghat,ghat2,λ,yt,Xt,Xt₀,β,L)
+         mStep!(ξ_new,A1,B1,AB2,ghat,ghat2,yt,Xt,Xt₀,β_new,L)
         
-         el1=ELBO(L,ξ_new,β_new,σ0_new,τ2_new,A1,B1,AB2,Sig1,Π,ghat,ghat2,Vg,S,yt,Xt,Xt₀)
+         el1=ELBO(L,ξ_new,β_new,σ0_new,τ2_new[1],A1,B1,AB2,Sig1,Π,ghat,ghat2,Vg,S,yt,Xt,Xt₀)
          if (isnan(el1))
            writedlm("./test/elbo_nan1.txt",[β_new σ0_new τ2_new])
            writedlm("./test/elbo_nan_xi.txt",ξ_new)
@@ -441,14 +445,14 @@ function emGLMM(L::Int64,yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{F
          #check later for performance
         #crit=norm(ξ_new-ξ)+norm(β_new-β)+abs(τ2_new-τ2)+norm(B1-B0)+norm(σ0_new-σ0)
          
-         ξ=ξ_new;β=β_new;σ0=σ0_new; τ2=τ2_new;el0=el1;A0[:,:]=A1;B0[:,:]=B1
+         ξ=ξ_new;σ0=σ0_new; τ2=τ2_new;el0=el1;A0[:,:]=A1;B0[:,:]=B1
         
           numitr +=1
         
         
     end
     println(numitr)
-    return Result(ξ,β,σ0,τ2,el0,A1, B1, Sig1)
+    return Result(ξ,β_new,σ0,τ2,el0,A1, B1, Sig1)
         
 end
 
@@ -523,57 +527,47 @@ end
 
 # EM for GLM
 function emGLM(L::Int64,y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float64},
-        β::Vector{Float64},ξ::Vector{Float64},σ0::Vector{Float64},Π::Vector{Float64};tol::Float64=1e-3,maxitr=1000)
+        ξ::Vector{Float64},σ0::Vector{Float64},Π::Vector{Float64};tol::Float64=1e-3,maxitr=1000)
     
-    n, p = size(X)
+    n, p = size(X);
     λ = zeros(n)##
     A0 =repeat(Π,outer=(1,L)) ; 
     B0=zeros(p,L); AB2=zeros(p,L)
    
     A1 =copy(A0); B1=copy(B0); Sig1=zeros(p,L)
-    σ0_new = zeros(L); ξ_new = zeros(n); β_new=zeros(axes(β))
+    σ0_new = zeros(L); ξ_new = zeros(n); β_new=zeros(size(X₀,2))
     
     crit =1.0; el0=0.0;numitr=1;
-     
-    open("./test/elbo_glm.txt","w")
+    open("./test/glm_elbo.txt","w") 
+    open("./test/glm_est.txt","w")
     while ((crit>=tol) && (numitr<= maxitr))
         ###check again!
-        λ= Lambda.(ξ) 
-        # println("inter=$(numitr) and λ:")
-        # println(λ)
-        postB!(A1, B1, Sig1, λ,y,X,X₀,β,σ0,A0,B0,Π,L)
-        # println("A1,B1,Sig1")
-        # display(A1)
-        # display(B1)
-        # display(Sig1)
-         σ0_new, AB2 = emB(A1, B1, Sig1,L)
-        #  println("σ0,AB2")
-        #  display(σ0_new)
-        #  display(AB2)
-         mStep!(ξ_new,β_new,A1,B1,AB2,λ,y,X,X₀,β,L;nitr=numitr)
-        #  println("new ξ, β")
-        #  display(ξ_new)
-        #  display(β)
+        λ[:]= Lambda.(ξ) 
+        
+        updateβ!(β_new,λ,A0,B0,y,X,X₀)
 
+        postB!(A1, B1, Sig1, λ,y,X,X₀,β_new,σ0,A0,B0,Π,L)
+        
+         σ0_new, AB2 = emB(A1, B1, Sig1,L)
+        
+         mStep!(ξ_new,A1,B1,AB2,y,X,X₀,β_new,L;nitr=numitr)
         
          el1=ELBO(L,ξ_new,β_new,σ0_new,A1,B1,AB2,Sig1,Π,y,X,X₀)
-        #  println("elbo = $(el1)")
-         f= open("./test/elbo_glm.txt","a")
-         writedlm(f,[numitr σ0_new el1 el1-el0])
+  
+         f= open("./test/glm_est.txt","a")
+         writedlm(f,[numitr σ0_new β_new el1])
          close(f)
      
          crit=abs(el1-el0)
-         #check later for performance
-        #  crit=norm(ξ_new-ξ)+norm(β_new-β)+abs(el1-el0) +norm(B1-B0)
          
-         ξ=ξ_new;β=β_new;σ0=σ0_new;el0=el1;A0[:,:]=A1;B0[:,:]=B1
+         ξ=ξ_new;σ0=σ0_new;el0=el1;A0[:,:]=A1;B0[:,:]=B1
         
           numitr +=1
         
         
     end
     println(numitr)
-    return ResGLM(ξ,β,σ0,el0,A1, B1, Sig1)
+    return ResGLM(ξ,β_new,σ0,el0,A1, B1, Sig1)
         
 end
 

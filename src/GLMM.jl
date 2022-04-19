@@ -118,7 +118,7 @@ function susieGLMM(L::Int64,Π::Vector{Float64},y::Vector{Float64},X::Matrix{Flo
     # res0 = susieGLM(L,Π,y,X,X₀;tol=1e-2)
     # ξ0 = sqrt.(res0.ξ.^2+τ0*S)
 
-    result = emGLMM(L,yt,Xt,Xt₀,S,τ0,β0,ξ0,σ0,Π;tol=tol)
+    result = emGLMM(L,yt,Xt,Xt₀,S,τ0,ξ0,σ0,Π;tol=tol)
     # result = emGLMM(L,yt,Xt,Xt₀,S,τ0,res0.β,ξ0,res0.σ0,Π;tol=tol)
         
 return result

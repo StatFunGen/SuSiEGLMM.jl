@@ -3,7 +3,8 @@
 export susieGLM, fineQTL_glm
 using GLM
 
-function susieGLM(n::Int64,L::Int64,Π::Vector{Float64},y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float64},Vector{Float64}};tol=1e-4)
+function susieGLM(n::Int64,L::Int64,Π::Vector{Float64},y::Vector{Float64},X::Matrix{Float64},
+    X₀::Union{Matrix{Float64},Vector{Float64}};tol=1e-4,maxitr=1000)
   
     # n =size(X,1)
     y1= zeros(n)
@@ -23,7 +24,7 @@ function susieGLM(n::Int64,L::Int64,Π::Vector{Float64},y::Vector{Float64},X::Ma
  ξ0 =sqrt.(getXy('N',X.^2.0,ν0)+getXy('N',X₀,β0).^2)
  
 
-    result = emGLM(L,y1,X,X₀,β0,ξ0,σ0,Π;tol=tol)
+    result = emGLM(L,y1,X,X₀,ξ0,σ0,Π;tol=tol,maxitr=maxitr)
         
 return result
 
@@ -52,6 +53,7 @@ Performs SuSiE (Sum of Single Effects model) GLM fine-mapping analysis for a bin
 - `L` : an integer. The number of single effects for SuSiE implementation. Default is `10`.
 - `Π` : a p x 1 vector of prior inclusion probabilities for SuSiE.  Default is `1/p`, where `p = size(X,2)`. If different probabilities are added to SNPs, the length of Π should be `p`.
 - `tol`: tolerance. Default is `1e-4`. 
+- `maxitr` : the maximum number of iteration for a case where the algrithm does not coverge.  Default is `1000`.
 
 # Output
 
@@ -68,7 +70,7 @@ Performs SuSiE (Sum of Single Effects model) GLM fine-mapping analysis for a bin
 
 """
 function fineQTL_glm(G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},
-    X₀::Union{Matrix{Float64},Vector{Float64}}=ones(length(y),1);L::Int64=10,Π::Vector{Float64}=[1/size(X,2)],tol=1e-4)
+    X₀::Union{Matrix{Float64},Vector{Float64}}=ones(length(y),1);L::Int64=10,Π::Vector{Float64}=[1/size(X,2)],tol=1e-4,maxitr=1000)
 
     Chr=sort(unique(G.chr)); n, p=size(X)
     est= @distributed (vcat) for j= eachindex(Chr)
@@ -83,7 +85,7 @@ function fineQTL_glm(G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},
                     Π1 = Π[midx]
                  end
 
-                 est0= susieGLM(n,L,Π1,y,X[:,midx],X₀;tol=tol)
+                 est0= susieGLM(n,L,Π1,y,X[:,midx],X₀;tol=tol,maxitr=maxitr)
                         est0
     end
 
