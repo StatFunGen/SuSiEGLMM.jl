@@ -79,20 +79,20 @@ function initialization(y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix
 end
 
 
-# version 1
-function susieGLMM(L::Int64,Π::Vector{Float64},yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{Float64},
-        S::Vector{Float64},est0::Null_est;tol=1e-4)
+# # version 1
+# function susieGLMM(L::Int64,Π::Vector{Float64},yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{Float64},
+#         S::Vector{Float64},est0::Null_est;tol=1e-4)
     
-    # n, p = size(Xt)
-    #initialization :
-     σ0 = 0.1*ones(L);
+#     # n, p = size(Xt)
+#     #initialization :
+#      σ0 = 0.1*ones(L);
 
    
-     result = emGLMM(L,yt,Xt,Xt₀,S,est0.τ2,est0.β,est0.ξ,σ0,Π;tol=tol)
+#      result = emGLMM(L,yt,Xt,Xt₀,S,est0.τ2,est0.β,est0.ξ,σ0,Π;tol=tol)
             
-    return result
+#     return result
     
-end 
+# end 
 
 # version 2
 function susieGLMM(L::Int64,Π::Vector{Float64},y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float64},Vector{Float64}},T::Matrix{Float64},
@@ -101,15 +101,15 @@ function susieGLMM(L::Int64,Π::Vector{Float64},y::Vector{Float64},X::Matrix{Flo
 
      
 # check if covariates are added as input and include the intercept. 
-    #  n=length(y) 
-    #     if(X₀!= ones(n,1)) #&&(size(X₀,2)>1)
-    #         X₀ = hcat(ones(n),X₀)
-    #     end
+     n=length(y) 
+        if(X₀!= ones(n,1)) #&&(size(X₀,2)>1)
+            X₀ = hcat(ones(n),X₀)
+        end
 
     Xt, Xt₀, yt = rotate(y,X,X₀,T)   
     # #initialization :
     σ0 = 0.1*ones(L); 
-     τ0 = 0.001  #rand(1)[1]; #arbitray
+    τ0 = 0.1  #rand(1)[1]; #arbitray
     β0 = glm(X₀,y,Binomial()) |> coef 
     ν0 =sum(repeat(Π,outer=(1,L)).*σ0',dims=2)[:,1] ; #ν²0
     ξ0 =sqrt.(getXy('N',Xt.^2.0,ν0)+ getXy('N',Xt₀,β0).^2+ τ0*S )
@@ -264,62 +264,61 @@ Performs SuSiE (Sum of Single Effects model) GLMM fine-mapping analysis for a bi
 
 
 """
-function fineQTL_glmm(G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},
-        X₀::Union{Matrix{Float64},Vector{Float64}},
-        T::Union{Array{Float64,3},Matrix{Float64}},S::Union{Matrix{Float64},Vector{Float64}};
-        LOCO::Bool=true,L::Int64=10,Π::Vector{Float64}=[1/size(X,2)],tol=1e-4)
+# function fineQTL_glmm(G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},
+#         X₀::Union{Matrix{Float64},Vector{Float64}},
+#         T::Union{Array{Float64,3},Matrix{Float64}},S::Union{Matrix{Float64},Vector{Float64}};
+#         LOCO::Bool=true,L::Int64=10,Π::Vector{Float64}=[1/size(X,2)],tol=1e-4)
     
-        Chr=sort(unique(G.chr));
+#         Chr=sort(unique(G.chr));
     
-     if(LOCO)     
+#      if(LOCO)     
              
-   est= @distributed (vcat) for j= eachindex(Chr)
-                midx= findall(G.chr.== Chr[j])
-                Xt, Xt₀, yt, init0 = initialization(y,X[:,midx],X₀,T[:,:,j],S[:,j];tol=tol)
-                           #check size of Π
+#    est= @distributed (vcat) for j= eachindex(Chr)
+#                 midx= findall(G.chr.== Chr[j])
+#                 Xt, Xt₀, yt, init0 = initialization(y,X[:,midx],X₀,T[:,:,j],S[:,j];tol=tol)
+#                            #check size of Π
                            
-                          if (Π==[1/size(X,2)]) #default value
-                              m=length(midx)
-                              Π1 =ones(m)/m #adjusting πⱼ
-                             elseif (length(Π)!= size(X,2))
-                                println("Error. The length of Π should match $(size(X,2)) SNPs!")
-                             else
-                              Π1 = Π[midx]
-                           end
+#                           if (Π==[1/size(X,2)]) #default value
+#                               m=length(midx)
+#                               Π1 =ones(m)/m #adjusting πⱼ
+#                              elseif (length(Π)!= size(X,2))
+#                                 println("Error. The length of Π should match $(size(X,2)) SNPs!")
+#                              else
+#                               Π1 = Π[midx]
+#                            end
                      
-                est0= susieGLMM(L,Π1,yt,Xt,Xt₀,S[:,j],init0;tol=tol)
-                        est0
-                           end
+#                 est0= susieGLMM(L,Π1,yt,Xt,Xt₀,S[:,j],init0;tol=tol)
+#                         est0
+#                            end
            
-    else #no loco for one genomic region
+#     else #no loco for one genomic region
             
-            est = @distributed (vcat) for j= eachindex(Chr)
-               midx= findall(G.chr.== Chr[j])
+#             est = @distributed (vcat) for j= eachindex(Chr)
+#                midx= findall(G.chr.== Chr[j])
                  
-               # check prior probabilities
-                 if (Π==[1/size(X,2)])
-                    m=length(midx)
-                    Π1 =ones(m)/m 
-                  elseif (length(Π)!= size(X,2))
-                    println("Error. The length of Π should match $(size(X,2)) SNPs!")
-                   else
-                    Π1 = Π[midx]
-                 end
+#                # check prior probabilities
+#                  if (Π==[1/size(X,2)])
+#                     m=length(midx)
+#                     Π1 =ones(m)/m 
+#                   elseif (length(Π)!= size(X,2))
+#                     println("Error. The length of Π should match $(size(X,2)) SNPs!")
+#                    else
+#                     Π1 = Π[midx]
+#                  end
                  
-                 Xt, Xt₀, yt, init0 = initialization(y,X[:,midx],X₀,T,S;tol=tol)
-                 est0 = susieGLMM(L,Π1,yt,Xt,Xt₀,S,init0;tol=tol)
-                 est0
-            end
+#                  Xt, Xt₀, yt, init0 = initialization(y,X[:,midx],X₀,T,S;tol=tol)
+#                  est0 = susieGLMM(L,Π1,yt,Xt,Xt₀,S,init0;tol=tol)
+#                  est0
+#             end
                      
                            
             
-    end # loco
+#     end # loco
  
  
-    return est
+#     return est
     
-end
-
+# end
 
 #version 2
 function fineQTL_glmm(K::Union{Array{Float64,3},Matrix{Float64}},G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},

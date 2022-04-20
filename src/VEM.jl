@@ -83,6 +83,19 @@ yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{Float64},S::Vector{Float64
     
 end
 
+function emG!(ghat2::Vector{Float64},τ2_new::Vector{Float64},Vg::Vector{Float64},ghat::Vector{Float64},S::Vector{Float64})
+    
+   
+    #e-step : update the second moment 
+    ghat2[:]= Vg+ghat.^2 
+    #m-step for τ²
+    τ2_new[:].= mean(ghat2./S)
+ 
+    # return ghat2, τ2_new
+    
+end
+
+
 # for initial values (H0)
 function postG!(ghat::Vector{Float64},Vg::Matrix{Float64},Badj::covAdj,S::Vector{Float64},τ2::Float64)
     
@@ -240,7 +253,7 @@ function updateβ!(β_new::Vector{Float64},λ::Vector{Float64},A0::Matrix{Float6
     yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{Float64})
     
     AB= getXX('N',Xt,'N',A0.*B0)
-    β_new[:]= symXX('T',(Diagonal(sqrt.(λ))*X₀))\getXy('T',Xt₀,(yt- λ.*(sum(AB,dims=2)[:,1]+ghat)))
+    β_new[:]= symXX('T',(Diagonal(sqrt.(λ))*Xt₀))\getXy('T',Xt₀,(yt- λ.*(sum(AB,dims=2)[:,1]+ghat)))
   
     #  β_new[:]= getXX('T',Xt₀,'N',(λ.*Xt₀))\getXy('T',Xt₀,(yt- λ.*(B2 + ghat)))
 end
@@ -310,25 +323,29 @@ function ELBO(L::Int64,ξ_new::Vector{Float64},β_new::Vector{Float64},σ0_new::
         A1::Matrix{Float64},B1::Matrix{Float64},AB2::Matrix{Float64},Sig1::Matrix{Float64},Π::Vector{Float64},ghat::Vector{Float64},
         ghat2::Vector{Float64},Vg::Vector{Float64},S::Vector{Float64},yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{Float64})
 
-    n=length(yt); p = size(B1,1); lnb =zeros(L);
+    n=length(yt); lnb =zeros(L);
     
-
-    AB1=getXy('N',Xt,sum(A1.*B1,dims=2)[:,1])
-     elbo0= ELBO(ξ_new,β_new,τ2_new,ghat,ghat2,Vg,AB1,S,yt,Xt₀)#null part
+    #  elbo0= ELBO(ξ_new,β_new,τ2_new,ghat,ghat2,Vg,AB1,S,yt,Xt₀)#null part
      # susie part
-    for l= 1: L 
+     @fastmath @inbounds @views for l= 1: L 
         if(sum(A1[:,l].==0.0)>0) #avoid NaN by log(0)
             lnb[l] = 0.0
         else
-            lnb[l]  = A1[:,l]'*(log.(A1[:,l])-log.(Π) - 0.5*log.(Sig1[:,l])) 
+            lnb[l]  = A1[:,l]'*(log.(A1[:,l])-log.(Π) - 0.5*log.(Sig1[:,l])) +0.5*sum(AB2[:,l])/σ0_new[l]
+            
         end
     end
     
                
-      bl= sum(lnb)+0.5*(sum(log.(σ0_new))- L)+ 0.5*sum(sum(AB2,dims=1)'./σ0_new)
-    
+    bl= sum(lnb)+0.5*(sum(log.(σ0_new))- L)
+
+    ll= sum(log.(logistic.(ξ_new))- 0.5*ξ_new)+ yt'*(getXy('N',Xt₀,β_new) + getXy('N',Xt,sum(A1.*B1,dims=2)[:,1]) + ghat) #lik
+    gl = -0.5*(n*log(τ2_new)+ sum(log.(S)-log.(Vg))- 1.0 + sum(ghat2./S)/τ2_new) # g
+     f=open("./test/susie_elbo.txt","a")
+       writedlm(f,[ll gl bl ll+gl-bl])
+     close(f)
          
-    return elbo0-bl
+    return ll+gl-bl
             
 end
     
@@ -385,9 +402,9 @@ function ELBO(L::Int64,ξ_new::Vector{Float64},β_new::Vector{Float64},σ0_new::
 end
            
 bl= sum(lnb)  +0.5*(sum(log.(σ0_new))- L)
-     f=open("./test/glm_elbo.txt","a")
-      writedlm(f,[ll bl ll-bl])
-     close(f)
+    #  f=open("./test/glm_elbo.txt","a")
+    #   writedlm(f,[ll bl ll-bl])
+    #  close(f)
 return ll-bl
         
 end
@@ -418,23 +435,24 @@ function emGLMM(L::Int64,yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{F
    
     A1 =copy(A0); B1=copy(B0); Sig1=zeros(p,L)
     ghat2=zeros(axes(S)); τ2_new=zeros(1);
-    σ0_new = zeros(L); ξ_new = zeros(n); β_new=zeros(sizze(Xt₀,2))
+    σ0_new = zeros(L); ξ_new = zeros(n); β_new=zeros(size(Xt₀,2))
     
     crit =1.0; el0=0.0;numitr=1
       
-    
+     open("./test/susie_elbo.txt","w")
     while (crit>=tol)
         ###check again!
          λ[:]= Lambda.(ξ)
          updateβ!(β_new,λ,A0,B0,ghat,yt,Xt,Xt₀)
          postG!(ghat,Vg,λ,yt,Xt,Xt₀,S,β_new,τ2,A0,B0)
-         emG!(ghat2,τ2_new,Vg,ghat,S,n)
+         emG!(ghat2,τ2_new,Vg,ghat,S)
          postB!(A1, B1, Sig1, λ,ghat,yt,Xt,Xt₀,β_new,σ0,A0,B0,Π,L)
          σ0_new, AB2 = emB(A1, B1, Sig1,L)
          
          mStep!(ξ_new,A1,B1,AB2,ghat,ghat2,yt,Xt,Xt₀,β_new,L)
         
          el1=ELBO(L,ξ_new,β_new,σ0_new,τ2_new[1],A1,B1,AB2,Sig1,Π,ghat,ghat2,Vg,S,yt,Xt,Xt₀)
+        
          if (isnan(el1))
            writedlm("./test/elbo_nan1.txt",[β_new σ0_new τ2_new])
            writedlm("./test/elbo_nan_xi.txt",ξ_new)
@@ -445,7 +463,7 @@ function emGLMM(L::Int64,yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{F
          #check later for performance
         #crit=norm(ξ_new-ξ)+norm(β_new-β)+abs(τ2_new-τ2)+norm(B1-B0)+norm(σ0_new-σ0)
          
-         ξ=ξ_new;σ0=σ0_new; τ2=τ2_new;el0=el1;A0[:,:]=A1;B0[:,:]=B1
+         ξ=ξ_new;σ0=σ0_new; τ2=τ2_new[1];el0=el1;A0[:,:]=A1;B0[:,:]=B1
         
           numitr +=1
         
@@ -538,8 +556,8 @@ function emGLM(L::Int64,y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float
     σ0_new = zeros(L); ξ_new = zeros(n); β_new=zeros(size(X₀,2))
     
     crit =1.0; el0=0.0;numitr=1;
-    open("./test/glm_elbo.txt","w") 
-    open("./test/glm_est.txt","w")
+    # open("./test/glm_elbo.txt","w") 
+    # open("./test/glm_est.txt","w")
     while ((crit>=tol) && (numitr<= maxitr))
         ###check again!
         λ[:]= Lambda.(ξ) 
@@ -554,9 +572,9 @@ function emGLM(L::Int64,y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float
         
          el1=ELBO(L,ξ_new,β_new,σ0_new,A1,B1,AB2,Sig1,Π,y,X,X₀)
   
-         f= open("./test/glm_est.txt","a")
-         writedlm(f,[numitr σ0_new β_new el1])
-         close(f)
+        #  f= open("./test/glm_est.txt","a")
+        #  writedlm(f,[numitr σ0_new β_new el1])
+        #  close(f)
      
          crit=abs(el1-el0)
          
