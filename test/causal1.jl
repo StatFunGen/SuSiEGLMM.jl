@@ -141,34 +141,35 @@ for j = 1:B
     Y=convert(Vector{Float64},Y)
     Y1=convert(Vector{Float64},Y1) 
     # writedlm("./testdata/dataY-julia.csv",Y)
-    Y0[:,j]=Y1
+    # Y0[:,j]=Y1
     
     t0=@elapsed begin
         # Xt, Xt₀, yt,init00= initialization(Y,X1,X₀,T,S;tol=1e-4)
-        Xt, Xt₀, yt,init00= initialization(Y,X1,ones(n,1),T,S;tol=1e-4)
-        T0= computeT(init00,yt,Xt₀,Xt)
+        # Xt, Xt₀, yt,init00= initialization(Y,X1,ones(n,1),T,S;tol=1e-4)
+ 
         # Xt, Xt₀, yt,init01= initialization(Y1,X1,ones(n,1),T,S;tol=1e-3)
-        # T1= computeT(init01,yt,Xt₀,Xt)
+        
+        # res= susieGLM(n,L, ones(p)/p,Y1,X1,ones(n,1);tol=1e-3) 
+        # res0= susieGLMM(L,ones(p)/p,Y1,X1,ones(n,1),T,S;tol=1e-3)
+        Xt, Xt₀, yt,init10=gLMM(Y1,X1,ones(n,1),T,S;tol=1e-4)
+        Xt, Xt₀, yt,init00=gLMM(Y,X1,ones(n,1),T,S;tol=1e-4)
+        T1= computeT(init10,yt,Xt₀,Xt)
+        T0= computeT(init00,yt,Xt₀,Xt)
+       
+        # Xt, Xt₀, yt,init=initialization(Y1,X1,ones(n,1),T,S;tol=1e-4)
     end
     init0=[init0;init00]
-    # init1=[init1;init01]
+    init1=[init1;init10]
     Ts[:,j]=T0;
-    # Ts1[:,j]=T1
+    Ts1[:,j]=T1
     # # Ps[:,j]=ccdf.(Chisq(1),T0); Ps1[:,j]=ccdf.(Chisq(1),T1)
     # tt[j]=t0
-    # #glm
-    #  h0= susieGLM(L, ones(p)/p,Y,X1,ones(n,1);tol=1e-4) 
-    #  res=[res;h0]
-    #  h1= susieGLM(L, ones(p)/p,Y1,X1,ones(n,1);tol=1e-5) 
-    #  res=[res;h1]
-    
-#    t0= @elapsed Ts,P0= scoreTest(K0,G,Y,X1;LOCO=false);
-#    Ps[:,j]=P0; tt[j]=t0; Tscore[:,j]=Ts
+    # res=[res;res0]
 end
 
 # writedlm("./test/y_causal1_1_pop_grm.txt",Y0)
 for j=1:B
-    Xt, Xt₀, yt,init01= initialization(Y0[:,j],X1,ones(n,1),T,S;tol=1e-4)
+    Xt, Xt₀, yt,init01= initialization(Y,X,ones(n,1),Matrix(1.0I,n,n),ones(n);tol=1e-4)
     T1= computeT(init01,yt,Xt₀,Xt)
     # Xt, Xt₀, yt,init01= initialization(Y1,X1,ones(n,1),T,S;tol=1e-3)
     # T1= computeT(init01,yt,Xt₀,Xt)
@@ -188,6 +189,7 @@ println("min median max times for glm are $(minimum(Tm)),$(median(Tm)), $(maximu
 #test glm
 Y= readdlm("./testdata/causal1_pop_Y.csv",',';skipstart=1)[:,1]
 res0= susieGLM(L, ones(p)/p,Y,X1,ones(n,1);tol=1e-3) 
+
 
 #susie-GLMM & glm
 #GLM
@@ -215,6 +217,9 @@ for j = 1:B
         init0=[init0;init00]
         Tscore[:,j]=T0;
 end
+
+
+
 
 b̂ = [res[2j-1].α[1]*res[2j-1].ν[1] for j=1:B]
 α̂ = [res[2j-1].α[1] for j=1:B]
