@@ -128,17 +128,17 @@ for j = 1:B
     b_1s[j] = b_true[1]   
     # b_true[1]=b_1s[j]
     # X=randn(n,p)
-    # g=rand(MvNormal(τ2*K)) #theoretical
-    g=rand(MvNormal(τ2*K0)) #grm
+    g=rand(MvNormal(τ2*K0)) #theoretical
+    # g=rand(MvNormal(τ2*K0)) #grm
     # writedlm("./testdata/dataX-julia.csv",X)
     # X₀=randn(n,c)
     # bhat=randn(c)
     # Y= logistic.(X*b_true+g) .>rand(n) #generating binary outcome
 
-    # Y= logistic.(g) .>rand(n)
+    Y= logistic.(g) .>rand(n)
     Y1=logistic.(X1*b_true+g) .>rand(n)
     # Y= logistic.(X1*b_true+g+X₀*bhat) .>rand(n) # random covariates independent of X:95%
-    # Y=convert(Vector{Float64},Y)
+    Y=convert(Vector{Float64},Y)
     Y1=convert(Vector{Float64},Y1) 
     # writedlm("./testdata/dataY-julia.csv",Y)
     # Y0[:,j]=Y1
@@ -146,23 +146,30 @@ for j = 1:B
     t0=@elapsed begin
         # Xt, Xt₀, yt,init00= initialization(Y,X1,X₀,T,S;tol=1e-4)
         # Xt, Xt₀, yt,init00= initialization(Y,X1,ones(n,1),T,S;tol=1e-4)
-        # T0= computeT(init00,yt,Xt₀,Xt)
+ 
         # Xt, Xt₀, yt,init01= initialization(Y1,X1,ones(n,1),T,S;tol=1e-3)
-        # T1= computeT(init01,yt,Xt₀,Xt)
-        res0= susieGLMM(L,ones(p)/p,Y1,X1,ones(n,1),T,S;tol=1e-3)
+        
+        # res= susieGLM(n,L, ones(p)/p,Y1,X1,ones(n,1);tol=1e-3) 
+        # res0= susieGLMM(L,ones(p)/p,Y1,X1,ones(n,1),T,S;tol=1e-3)
+        Xt, Xt₀, yt,init10=gLMM(Y1,X1,ones(n,1),T,S;tol=1e-4)
+        Xt, Xt₀, yt,init00=gLMM(Y,X1,ones(n,1),T,S;tol=1e-4)
+        T1= computeT(init10,yt,Xt₀,Xt)
+        T0= computeT(init00,yt,Xt₀,Xt)
+       
+        # Xt, Xt₀, yt,init=initialization(Y1,X1,ones(n,1),T,S;tol=1e-4)
     end
-    # init0=[init0;init00]
-    # init1=[init1;init01]
-    # Ts[:,j]=T0;
-    # Ts1[:,j]=T1
+    init0=[init0;init00]
+    init1=[init1;init10]
+    Ts[:,j]=T0;
+    Ts1[:,j]=T1
     # # Ps[:,j]=ccdf.(Chisq(1),T0); Ps1[:,j]=ccdf.(Chisq(1),T1)
     # tt[j]=t0
-    res=[res;res0]
+    # res=[res;res0]
 end
 
 # writedlm("./test/y_causal1_1_pop_grm.txt",Y0)
 for j=1:B
-    Xt, Xt₀, yt,init01= initialization(Y0[:,j],X1,ones(n,1),T,S;tol=1e-4)
+    Xt, Xt₀, yt,init01= initialization(Y,X,ones(n,1),Matrix(1.0I,n,n),ones(n);tol=1e-4)
     T1= computeT(init01,yt,Xt₀,Xt)
     # Xt, Xt₀, yt,init01= initialization(Y1,X1,ones(n,1),T,S;tol=1e-3)
     # T1= computeT(init01,yt,Xt₀,Xt)
