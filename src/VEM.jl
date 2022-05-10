@@ -280,8 +280,8 @@ function mStep!(ξ_new::Vector{Float64},ghat::Vector{Float64},ghat2::Vector{Floa
 temp= ŷ₀.^2 + ghat2 + 2(ŷ₀.*ghat)
 tidx =findall(temp.<0.0)
 if (!isempty(tidx))
-    writedlm("./test/err_beta_h0.txt",β)
-    writedlm("./test/domain_error_h0.txt",[ tidx temp[tidx] ghat2[tidx] ŷ₀[tidx] ghat[tidx] ])
+    writedlm(homedir()*"/GIT/susie-glmm/SuSiEGLMM.jl/test/err_beta_h0.txt",β)
+    writedlm(homedir()*"/GIT/susie-glmm/SuSiEGLMM.jl/test/domain_error_h0.txt",[ tidx temp[tidx] ghat2[tidx] ŷ₀[tidx] ghat[tidx] ])
     # temp[tidx].= 0.000001
     temp.= 0.00001
 end
@@ -384,8 +384,8 @@ function ELBO(ξ_new::Vector{Float64},τ2_new::Vector{Float64},Badj::covAdj,ghat
     # println("τ2_new: $(τ2_new)")
     
     gl = -0.5*(n*log(τ2_new[1])+ sum(log.(S))-logdet(Vg)- 1.0 + tr(ghat2./S)/τ2_new[1]) # g
-    f=open("./test/elbo_components.txt","a")
-    writedlm(f,[ll lbeta gl ll+gl+lbeta])
+    f=open(homedir()*"/GIT/susie-glmm/SuSiEGLMM.jl/test/est_elbocomp.txt","a")
+    writedlm(f,[τ2_new[1] ll lbeta gl ll+gl+lbeta])
     close(f)
 
     return ll+gl+lbeta
@@ -399,9 +399,9 @@ function ELBO(ξ_new::Vector{Float64},β_new::Vector{Float64},τ2_new::Float64,g
 ll= sum(log.(logistic.(ξ_new))- 0.5*ξ_new)+ yt'*(getXy('N',Xt₀,β_new) + ghat) #lik
 gl = -0.5*(n*log(τ2_new)+ sum(log.(S)-log.(Vg))- 1.0 + sum(ghat2./S)/τ2_new) # g
   
-    f=open("./test/elbo_glmm.txt","a")
-    writedlm(f,[ll gl ll+gl])
-    close(f)
+    # f=open("./test/elbo_glmm.txt","a")
+    # writedlm(f,[ll gl ll+gl])
+    # close(f)
 
 
 return ll+gl
@@ -523,9 +523,9 @@ function emGLMM(yt,Xt₀,S,τ2,ξ;tol::Float64=1e-4)
     
     crit =1.0; el0=0.0;numitr=1
       
-    open("./test/elbo_glmm.txt","w")
-    open("./test/glmm_est.txt","w")
-    open("./test/glmm_decElbo.txt","w")
+    # open("./test/elbo_glmm.txt","w")
+    open(homedir()*"/GIT/susie-glmm/SuSiEGLMM.jl/test/glmm_est.txt","w")
+    # open("./test/glmm_decElbo.txt","w")
     while (crit>=tol)
         ###check again!
         λ[:]= Lambda.(ξ) 
@@ -537,15 +537,15 @@ function emGLMM(yt,Xt₀,S,τ2,ξ;tol::Float64=1e-4)
 
         
          el1=ELBO(ξ_new,β_new,τ2_new[1],ghat,ghat2,Vg,S,yt,Xt₀,n)
-          f= open("./test/glmm_est.txt","a")
+          f= open(homedir()*"/GIT/susie-glmm/SuSiEGLMM.jl/test/glmm_est.txt","a")
             writedlm(f,[numitr τ2_new β_new el1])
           close(f)
 
-          if(el0>el1)
-           fi=open("./test/glmm_decElbo.txt","a")
-           writedlm(fi, [numitr el1 el1-el0])
-           close(fi)
-          end
+        #   if(el0>el1)
+        #    fi=open("./test/glmm_decElbo.txt","a")
+        #    writedlm(fi, [numitr el1 el1-el0])
+        #    close(fi)
+        #   end
 
          crit=abs(el1-el0)
       
@@ -572,8 +572,8 @@ function emGLMM(yt,Xt₀,S,τ2,ξ,Σ₀;tol::Float64=1e-4)
     # Vβ̂inv,Badj = covarAdj(Xy₀,yt,Xt₀,Σ₀,ξ,n)
    
     crit =1.0; el0=0.0;numitr=1
-    open("./test/elbo_components.txt","w") 
-     open("./test/decELBO.txt","w")
+    open(homedir()*"/GIT/susie-glmm/SuSiEGLMM.jl/test/est_elbocomp.txt","w") 
+    #  open("./test/decELBO.txt","w")
     while (crit>=tol)
         ###check again!
          Vβ̂inv,Badj= covarAdj(Xy₀,yt,Xt₀,Σ₀,ξ,n) 
@@ -584,11 +584,11 @@ function emGLMM(yt,Xt₀,S,τ2,ξ,Σ₀;tol::Float64=1e-4)
 
          el1=ELBO(ξ_new,τ2_new,Badj,ghat,ghat2,Vg,S,Xy₀,Vβ̂inv,Σ₀,n)
      
-         if(el0>el1)
-          f=open("./test/decELBO.txt","a")
-            writedlm(f,[numitr τ2_new el1 el1-el0])
-          close(f)
-         end
+        #  if(el0>el1)
+        #   f=open("./test/decELBO.txt","a")
+        #     writedlm(f,[numitr τ2_new el1 el1-el0])
+        #   close(f)
+        #  end
          crit=abs(el1-el0)
         #  crit=norm(ξ_new-ξ)+norm(τ2_new-τ2)+abs(el1-el0)  
         
