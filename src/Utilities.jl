@@ -103,7 +103,7 @@ end
 
 function rotateY(y::Vector{Float64},T::Matrix{Float64})
     
-    n=length(y)
+    # n=length(y)
     
     #U'X, U'X₀, U'(y-1/2)
     yt= BLAS.gemv('N',T,(y.-0.5))
