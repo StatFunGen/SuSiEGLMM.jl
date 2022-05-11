@@ -62,7 +62,7 @@ function initialization(y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix
    
     #initialization
      Σ0= 2(cov(Xt₀)+I) # avoid sigularity when only with intercept
-     τ0 = 0.1 #rand(1)[1]; #arbitray
+     τ0 = 1.99 
     # τ0=1.2   
     # β0 = glm(X₀,y,Binomial()) |> coef
     sig0=getXX('N',Σ0,'T',Xt₀)
@@ -88,7 +88,7 @@ function gLMM(y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float64},
     Xt, Xt₀, yt = rotate(y,X,X₀,T)   
 
 #initialization
-    τ² = 0.1 #rand(1)[1]; #arbitray
+    τ² = 1.99 
     β0 = glm(X₀,y,Binomial()) |> coef
     ξ0 =sqrt.(getXy('N',Xt₀,β0).^2+ τ²*S)
 
@@ -114,8 +114,8 @@ function susieGLMM(L::Int64,Π::Vector{Float64},y::Vector{Float64},X::Matrix{Flo
 
     Xt, Xt₀, yt = rotate(y,X,X₀,T)   
     # #initialization :
-    σ0 = 0.1*ones(L); 
-    τ0 = 0.1   #rand(1)[1]; #arbitray
+    σ0 = ones(L); 
+    τ0 = 1.99  
     β0 = glm(X₀,y,Binomial()) |> coef 
     ν0 =sum(repeat(Π,outer=(1,L)).*σ0',dims=2)[:,1] ; #ν²0
     ξ0 =sqrt.(getXy('N',Xt.^2.0,ν0)+ getXy('N',Xt₀,β0).^2+ τ0*S )
