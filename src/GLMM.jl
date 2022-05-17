@@ -422,4 +422,4 @@ function fineMapping1(f::Function,args...;kwargs...)
 end
 
 
-export init, initialization, fineQTL_glmm, susieGLMM, computeT, scoreTest, GenoInfo, gLMM
+export init, initialization, fineQTL_glmm, susieGLMM, computeT, scoreTest, GenoInfo, gLMM,glmmNull
