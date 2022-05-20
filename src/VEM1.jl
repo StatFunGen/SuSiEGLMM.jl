@@ -76,7 +76,7 @@ end
 function mStep!(ξ_new::Vector{Float64},Vg::Vector{Float64},
         ghat::Vector{Float64},Badj::intOut,Xt₀::Matrix{Float64},n::Int64)
   
-    M=copy(Badj.M); V =zeros(n,n);
+    V =zeros(n,n);
     V[:,:]=Diagonal(Vg)
     
    
