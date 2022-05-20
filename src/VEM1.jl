@@ -193,5 +193,5 @@ function glmmNull(y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float
 
     est0= emNull(yt,Xt₀,S,τ0,ξ0,Σ0;tol=tol)
    
- return Xt, Xt₀, yt, est0
+ return est0
 end
