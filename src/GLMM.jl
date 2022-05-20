@@ -128,20 +128,20 @@ end
 
 
 # compute score test statistic : need to check again
-function computeT(init0::Approx0,yt::Vector{Float64},Xt₀::Matrix{Float64},Xt::Matrix{Float64})
+function computeT(init0::Approx0,y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float64})
     
-        n,m=axes(Xt); Tstat= zeros(m); ĝ=zeros(n)
-        r₀ =  2*yt.*(getXy('N',Xt₀,init0.β)+init0.μ)  
+        n,m=axes(X); Tstat= zeros(m); ĝ=zeros(n)
+        r₀ =  2(y.-1.0).*(getXy('N',X₀,init0.β)+init0.μ)  
         p̂ = logistic.(r₀)
         Γ  = p̂.*(1.0.-p̂)
         # XX=Xt₀'Diagonal(Γ)
-        proj= I - Xt₀*(symXX('T',sqrt.(Γ).*Xt₀)\(Xt₀'Diagonal(Γ)))
+        proj= I - X₀*(symXX('T',sqrt.(Γ).*X₀)\(X₀'Diagonal(Γ)))
         # proj = I - Xt₀*(getXX('N',XX,'N',Xt₀))\XX
-        G̃ = getXX('N',proj,'N',Xt)
+        G̃ = getXX('N',proj,'N',X)
     
         
         
-        ĝ = getXy('T',G̃,(yt-p̂)).^2
+        ĝ = getXy('T',G̃,(y-p̂)).^2
     
     #    @fastmath @inbounds @views for j = m
            for j = m
@@ -196,19 +196,21 @@ function scoreTest(K::Union{Array{Float64,3},Matrix{Float64}},G::GenoInfo,y::Vec
 
          T_stat = @distributed (vcat) for j= eachindex(Chr)
                        midx= findall(G.chr.== Chr[j])
-                       Xt, Xt₀, yt, init0 = initialization(y,X[:,midx],X₀,T[:,:,j],S[:,j];tol=tol) 
-                       tstat = computeT(init0,yt,Xt₀,Xt)
+                    #    Xt, Xt₀, yt, init0 = initialization(y,X[:,midx],X₀,T[:,:,j],S[:,j];tol=tol) 
+    
+                       init0=glmmNull(y,X[:,midx],X₀,T[:,:,j],S[:,j];tol=tol)
+                       tstat = computeT(init0,y,X[:,midx],X₀)
                         tstat
                      end
 
 
     else #no loco
 
-        Xt, Xt₀, yt, init0 = initialization(y,X,X₀,T,S;tol=tol) 
-         
+        # Xt, Xt₀, yt, init0 = initialization(y,X,X₀,T,S;tol=tol) 
+        init0=glmmNull(y,X,X₀,T,S;tol=tol)
         T_stat = @distributed (vcat) for j= eachindex(Chr)
             midx= findall(G.chr.== Chr[j])
-            tstat = computeT(init0,yt,Xt₀,Xt[:,midx])
+            tstat = computeT(init0,y,X,X₀)
             tstat
          end
         
