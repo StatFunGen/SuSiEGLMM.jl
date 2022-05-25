@@ -16,6 +16,7 @@ function init(yt::Vector{Float64},Xt₀::Matrix{Float64},S::Vector{Float64},ξ::
 end
 
 
+## glmm: integration out (Peter's version)
 
 """
 

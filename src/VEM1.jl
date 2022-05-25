@@ -71,6 +71,26 @@ function postG!(ghat::Vector{Float64},Vg::Vector{Float64},Badj::intOut,S::Vector
     
 end
 
+# g for QTL 
+function postG!(ghat::Vector{Float64},Vg::Vector{Float64},Badj::intOut,S::Vector{Float64},τ2::Float64,Xt::Vector{Float64},b0::Vector{Float64})
+
+    Vg[:]= 1.0./(Badj.λ+ 1.0./(τ2*S))
+    
+    ghat[:] = Xt
+
+    ghat[:]= Vg.*(Badj.Ŷ-lmul!(Diagonal(Badj.λ),ghat).*b0)
+
+end
+
+#b for QTL
+function postb!(b1::Vector{Float64},σ1::Vector{Float64},Badj::intOut,ghat::Vector{Float64},Xt::Vector{Float64},σ0::Vector{Float64})
+        
+    x =copy(Xt); Λ=Diagonal(Badj.λ)
+    σ1[:] = 1.0./(Xt'*lmul!(Λ,x) + 1.0./σ0)
+    b1[:].= σ1.*Xt'*(Badj.Ŷ-lmul!(Λ,ghat))
+end
+
+
 
 #M-step: H0 for initial values (integration out version)
 function mStep!(ξ_new::Vector{Float64},Vg::Vector{Float64},
@@ -81,11 +101,27 @@ function mStep!(ξ_new::Vector{Float64},Vg::Vector{Float64},
     
    
     ξ_new[:]= sqrt.((getXy('N',Xt₀,Badj.β̂)- getXy('N', Badj.M,ghat)+ ghat).^2 
-    + Diagonal(symXX('N',Badj.M.*sqrt.(Vg)')+ V+ BLAS.symm('R','U',(Diagonal(1.0./Badj.λ)-2V),Badj.M))*ones(n))
+    + Diagonal(symXX('N',Badj.M.*sqrt.(Vg))+ V+ BLAS.symm('R','U',(Diagonal(1.0./Badj.λ)-2V),Badj.M))*ones(n))
      
     
     # M= symXX('N',rmul!(M,Diagonal(sqrt.(Vg))) + Diagonal(Vg)
     # Badj.M*Diagonal(1.0./Badj.λ-2Vg)
+end
+
+# ξ for QTL : expensive!
+function mStep!(ξ_new::Vector{Float64},b1::Vector{Float64},σ1::Vector{Float64},Vg::Vector{Float64},ghat::Vector{Float64},
+    Badj::intOut,Xt₀::Matrix{Float64},Xt::Vector{Float64},n::Int64)
+     
+     
+     mu = Xt.*b1 + ghat
+     Sig = σ1[1]XtXt' + Diagonal(Vg)
+     U,Λ,=svd(Sig)
+     lmul!(U,Diagonal(sqrt.(Λ)))
+    
+    ξ_new[:]= sqrt.((getXy('N',Xt₀,Badj.β̂)- getXy('N', Badj.M,mu)+ mu).^2 
+                + Diagonal(BLAS.symm('R','U',Diagonal(1.0./Badj.λ)-2Sig,Badj.M)+symXX('N',getXX('N',Badj.M,'N',U))+Sig)*ones(n) )
+
+                # Badj.M*(inv(Badj.λ)-2Vg+BLAS.symm('R','U',Vg,Badj.M)')+Vg
 end
 
 
@@ -195,3 +231,4 @@ function glmmNull(y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float
    
  return est0
 end
+
