@@ -16,6 +16,7 @@ function init(yt::Vector{Float64},Xt₀::Matrix{Float64},S::Vector{Float64},ξ::
 end
 
 
+## glmm: integration out (Peter's version)
 
 """
 
@@ -210,6 +211,7 @@ function scoreTest(K::Union{Array{Float64,3},Matrix{Float64}},G::GenoInfo,y::Vec
         init0=glmmNull(y,X,X₀,T,S;tol=tol)
         T_stat = @distributed (vcat) for j= eachindex(Chr)
             midx= findall(G.chr.== Chr[j])
+            init0=glmmNull(y,X[:,midx],X₀,T,S;tol=tol)
             tstat = computeT(init0,y,X,X₀)
             tstat
          end
