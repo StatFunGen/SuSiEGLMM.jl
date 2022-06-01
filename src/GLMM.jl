@@ -132,7 +132,7 @@ end
 function computeT(init0::Approx0,y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float64})
     
         n,m=axes(X); Tstat= zeros(m); ĝ=zeros(n)
-        r₀ =  2(y.-1.0).*(getXy('N',X₀,init0.β)+init0.μ)  
+        r₀ =  (2y.-1.0).*(getXy('N',X₀,init0.β)+init0.μ)  
         p̂ = logistic.(r₀)
         Γ  = p̂.*(1.0.-p̂)
         # XX=Xt₀'Diagonal(Γ)
