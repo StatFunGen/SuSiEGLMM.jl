@@ -62,12 +62,13 @@ end
 
 #E-step
 
-# g for initial values (H0): integration out version
+# g for H0: integration out version
 function postG!(ghat::Vector{Float64},Vg::Vector{Float64},Badj::intOut,S::Vector{Float64},τ2::Float64)
     
     Vg[:]= 1.0./(Badj.λ+1.0./(τ2*S))
     # println("pdf of Vg is", isposdef(Vg))
-    ghat[:]= Vg.*Badj.Ŷ
+    ghat[:]=Badj.Ŷ
+    lmul!(Diagonal(Vg),ghat)
     
 end
 
@@ -76,28 +77,34 @@ function postG!(ghat::Vector{Float64},Vg::Vector{Float64},Badj::intOut,S::Vector
 
     Vg[:]= 1.0./(Badj.λ+ 1.0./(τ2*S))
     
-    ghat[:] = Xt
+    ghat[:] = rmul!(Xt[:,:],b0[1])
 
-    ghat[:]= Vg.*(Badj.Ŷ-lmul!(Diagonal(Badj.λ),ghat).*b0)
+    ghat[:]= Badj.Ŷ-lmul!(Diagonal(Badj.λ),ghat)
+    lmul!(Diagonal(Vg),ghat)
 
 end
 
 #b for QTL
-function postb!(b1::Vector{Float64},σ1::Vector{Float64},Badj::intOut,ghat::Vector{Float64},Xt::Vector{Float64},σ0::Vector{Float64})
+function postB!(b1::Vector{Float64},σ1::Vector{Float64},Badj::intOut,ghat::Vector{Float64},Xt::Vector{Float64},σ0::Vector{Float64})
         
-    x =copy(Xt); Λ=Diagonal(Badj.λ)
-    σ1[:] = 1.0./(Xt'*lmul!(Λ,x) + 1.0./σ0)
-    b1[:].= σ1.*Xt'*(Badj.Ŷ-lmul!(Λ,ghat))
+     Λ=convert(Matrix{Float64},Diagonal(Badj.λ));
+    σ1[:].=1.0/(Xt'BLAS.symv('U',Λ,Xt)+1.0/σ0[1])
+    b1[:].=Xt'(Badj.Ŷ-BLAS.symv('U',Λ,ghat))
+    lmul!(σ1[1],b1)
 end
 
+function emB!(b2::Vector{Float64},σ0_new::Vector{Float64},b1::Vector{Float64},σ1::Vector{{Float64}})
 
+    b2[:] = b1.^2+ σ1
+    σ0_new[:].= mean(b2)
+    
+end
 
-#M-step: H0 for initial values (integration out version)
+#M-step: H0  (integration out version)
 function mStep!(ξ_new::Vector{Float64},Vg::Vector{Float64},
         ghat::Vector{Float64},Badj::intOut,Xt₀::Matrix{Float64},n::Int64)
   
-    V =zeros(n,n);
-    V[:,:]=Diagonal(Vg)
+    V=convert(Matrix{Foat64},Diagonal(Vg))
     
    
     ξ_new[:]= sqrt.((getXy('N',Xt₀,Badj.β̂)- getXy('N', Badj.M,ghat)+ ghat).^2 
@@ -112,21 +119,25 @@ end
 function mStep!(ξ_new::Vector{Float64},b1::Vector{Float64},σ1::Vector{Float64},Vg::Vector{Float64},ghat::Vector{Float64},
     Badj::intOut,Xt₀::Matrix{Float64},Xt::Vector{Float64},n::Int64)
      
+     mu = zeros(n); M1 = zeros(n,n);
+     mu[:] = Xt
+     rmul!(mu,b1[1])
+     mu[:] = mu + ghat
      
-     mu = Xt.*b1 + ghat
-     Sig = σ1[1]XtXt' + Diagonal(Vg)
-     U,Λ,=svd(Sig)
-     lmul!(U,Diagonal(sqrt.(Λ)))
-    
-    ξ_new[:]= sqrt.((getXy('N',Xt₀,Badj.β̂)- getXy('N', Badj.M,mu)+ mu).^2 
-                + Diagonal(BLAS.symm('R','U',Diagonal(1.0./Badj.λ)-2Sig,Badj.M)+symXX('N',getXX('N',Badj.M,'N',U))+Sig)*ones(n) )
+     Sig = convert(Matrix{Float64}, Diagonal(Vg))
+     Sig = Symmetric(BLAS.syr!('U',σ1[1],Xt,Sig))
+                
+    mul!(M1,BLAS.symm('R','U',Sig,Badj.M),Badj.M') #M*Sig*M'      
 
-                # Badj.M*(inv(Badj.λ)-2Vg+BLAS.symm('R','U',Vg,Badj.M)')+Vg
+    ξ_new[:]= sqrt.((getXy('N',Xt₀,Badj.β̂)- getXy('N', Badj.M,mu)+ mu).^2 
+                + Diagonal(M1+BLAS.symm('R','U',Diagonal(1.0./Badj.λ)-2Sig,Badj.M)+Sig)*ones(n) )
+                
+
 end
 
 
     
-# For initial values : H0 w/o susie (integration out version)
+# For H0 (integration out version)
 function ELBO(ξ_new::Vector{Float64},τ2_new::Vector{Float64},Badj::intOut,ghat::Vector{Float64},
         ghat2::Vector{Float64},Vg::Vector{Float64},S::Vector{Float64},
         Xy₀::Vector{Float64},Σ₀::Matrix{Float64},n::Int64)
@@ -146,6 +157,20 @@ function ELBO(ξ_new::Vector{Float64},τ2_new::Vector{Float64},Badj::intOut,ghat
     
 end
 
+# for QTL
+function ELBO(ξ_new::Vector{Float64},τ2_new::Vector{Float64},σ0_new::Vector{Float64},Badj::intOut,b2::Vector{Float64},σ1::Vector{Float64},ghat::Vector{Float64},
+    ghat2::Vector{Float64},Vg::Vector{Float64},S::Vector{Float64},Xt::Vector{Float64},
+    Xy₀::Vector{Float64},Σ₀::Matrix{Float64},n::Int64)
+     
+    
+      ll0 = ELBO(ξ_new,τ2_new,Badj,ghat,ghat2,Vg,S,Xy₀,Σ₀,n)
+      @fastmath @inbounds @views lb = Badj.Ŷ'(Xt*b1[1]) - 0.5(log(σ0_new[1])-log(σ1[1])-1.0+b2[1]/σ0_new[1])
+
+      return ll0+lb
+   
+
+end
+
 
 # struct Approx0
 #     β::Vector{Float64}
@@ -156,7 +181,7 @@ end
 # end
 
 
-#EM for initial values (H0): integration out version
+#EM for H0: integration out version
 function emNull(yt,Xt₀,S,τ2,ξ,Σ₀;tol::Float64=1e-4)
     
     
@@ -202,9 +227,7 @@ end
 
 
 
-
-
-
+## glmm estimation (H0) for score test
 function glmmNull(y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float64},Vector{Float64}},T::Matrix{Float64},
     S::Vector{Float64};tol=1e-4)
 
@@ -230,5 +253,64 @@ function glmmNull(y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float
     est0= emNull(yt,Xt₀,S,τ0,ξ0,Σ0;tol=tol)
    
  return est0
+end
+
+
+struct Approx
+    β::Vector{Float64}
+    ν::Vector{Float64}
+    σ1::Vector{Float64}
+    ξ::Vector{Float64}
+    μ::Vector{Float64}
+    τ2::Float64
+    σ0::Float64
+    elbo::Float64
+end
+
+
+
+## EM for QTL
+function emAlt(yt,Xt,Xt₀,S,τ2,σ0::Float64,ξ,Σ₀;tol::Float64=1e-4)
+    
+    
+    n,c=size(Xt₀)
+    ghat =zeros(n); Vg = zeros(n);# λ = zeros(n)##
+    
+    ghat2=zeros(n); τ2_new=zeros(1); τ2 =[τ2]; 
+    b0=zeros(1); b1=zeros(1); σ0_new =zeros(1); σ0=[σ0]
+    ξ_new = zeros(n); 
+    
+    Xy₀=getXy('T',Xt₀,yt) #X₀'y
+    # Vβ̂inv,Badj = covarAdj(Xy₀,yt,Xt₀,Σ₀,ξ,n)
+   
+    crit =1.0; el0=0.0;numitr=0
+    open(homedir()*"/GIT/susie-glmm/SuSiEGLMM.jl/test/est_elbo1.txt","w") 
+    #  open("./test/decELBO.txt","w")
+    while (crit>=tol)
+        ###check again!
+         Badj= intβOut(Xy₀,yt,Xt₀,Σ₀,ξ,n) 
+         postG!(ghat,Vg,Badj,S,τ2[1],Xt,b0)
+         emG!(ghat2,τ2_new,Vg,ghat,S)
+         postB!(b1,σ1,Badj,ghat,Xt,σ0)
+         emB!(b2,σ0_new,b1,σ1)
+         mStep!(ξ_new,b1,σ1,Vg,ghat,Badj,Xt₀,Xt,n)
+
+         el1=ELBO(ξ_new,τ2_new,σ0_new,Badj,b2,σ1,ghat,ghat2,Vg,S,Xt,Xy₀,Σ₀,n)
+     
+        #  if(el0>el1)
+        #   f=open("./test/decELBO.txt","a")
+        #     writedlm(f,[numitr τ2_new el1 el1-el0])
+        #   close(f)
+        #  end
+         crit=abs(el1-el0)
+        #  crit=norm(ξ_new-ξ)+norm(τ2_new-τ2)+abs(el1-el0)  
+        
+         ξ=ξ_new; τ2=τ2_new;el0=el1;σ0=σ0_new
+        
+          numitr +=1        
+    end
+    println(numitr)
+    return Approx(Badj.β,b1,σ1,ξ,ghat,τ2[1],σ0_new[1],el0)
+    
 end
 
