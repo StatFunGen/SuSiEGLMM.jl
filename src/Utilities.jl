@@ -138,7 +138,7 @@ function symXX(t::Char,X::Array{Float64,2})
     
    XtX = Symmetric(BLAS.syrk('U',t,1.0,X))
     
-    return XtX
+    return convert(Matrix{Float64},XtX)
     
 end
 

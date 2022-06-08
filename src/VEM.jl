@@ -10,7 +10,7 @@
 
 # using Statistics, LinearAlgebra, Random, StatsBase, Distributions, Distributed
 
-
+## integration out version based on Peter's derivation
 
 
 export covarAdj, postG!, emG!, postB!,emB,mStep!,ELBO,emGLMM,emGLM, Result, Approx0, ResGLM
