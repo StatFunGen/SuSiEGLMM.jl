@@ -103,7 +103,7 @@ end
 
 
 
-# version 2
+# no integrating β out 
 function susieGLMM(L::Int64,Π::Vector{Float64},y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float64},Vector{Float64}},T::Matrix{Float64},
     S::Vector{Float64};tol=1e-4)
    
@@ -128,7 +128,7 @@ return result
 end 
 
 
-# compute score test statistic : need to check again
+# compute score test statistic : need to check & add score and var in return
 function computeT(init0::Approx0,y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float64})
     
         n,m=axes(X); Tstat= zeros(m); ĝ=zeros(n)
@@ -183,7 +183,7 @@ Returns 1-df score test statistic for case-control association tests that follow
 
 """
 function scoreTest(K::Union{Array{Float64,3},Matrix{Float64}},G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float64},Vector{Float64}}=ones(length(y),1)
-        ;LOCO::Bool=true,tol=1e-4)
+        ;LOCO::Bool=false,tol=1e-4)
     
         Chr=sort(unique(G.chr));
         T, S = svdK(K;LOCO=LOCO)
@@ -199,7 +199,7 @@ function scoreTest(K::Union{Array{Float64,3},Matrix{Float64}},G::GenoInfo,y::Vec
                        midx= findall(G.chr.== Chr[j])
                     #    Xt, Xt₀, yt, init0 = initialization(y,X[:,midx],X₀,T[:,:,j],S[:,j];tol=tol) 
     
-                       init0=glmmNull(y,X[:,midx],X₀,T[:,:,j],S[:,j];tol=tol)
+                       init0=glmmNull(y,X₀,T[:,:,j],S[:,j];tol=tol)
                        tstat = computeT(init0,y,X[:,midx],X₀)
                         tstat
                      end
@@ -208,13 +208,13 @@ function scoreTest(K::Union{Array{Float64,3},Matrix{Float64}},G::GenoInfo,y::Vec
     else #no loco
 
         # Xt, Xt₀, yt, init0 = initialization(y,X,X₀,T,S;tol=tol) 
-        init0=glmmNull(y,X,X₀,T,S;tol=tol)
-        T_stat = @distributed (vcat) for j= eachindex(Chr)
-            midx= findall(G.chr.== Chr[j])
-            init0=glmmNull(y,X[:,midx],X₀,T,S;tol=tol)
+       
+        # T_stat = @distributed (vcat) for j= eachindex(Chr)
+        #     midx= findall(G.chr.== Chr[j])
+            init0=glmmNull(y,X₀,T,S;tol=tol)
             tstat = computeT(init0,y,X,X₀)
-            tstat
-         end
+        #     tstat
+        #  end
         
     end
     
@@ -369,33 +369,33 @@ end
 
 # end
 
-function fineMapping(G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float64},Vector{Float64}}=ones(length(y),1);
-        K::Union{Array{Float64,3},Matrix{Float64}}=Matrix(1.0I,1,1),L::Int64=10,Π::Vector{Float64}=[1/size(X,2)],LOCO::Bool=true,
-        model=["susieglmm","susieglm","susie","mvsusie"],tol=1e-4)
+# function fineMapping(G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float64},Vector{Float64}}=ones(length(y),1);
+#         K::Union{Array{Float64,3},Matrix{Float64}}=Matrix(1.0I,1,1),L::Int64=10,Π::Vector{Float64}=[1/size(X,2)],LOCO::Bool=true,
+#         model=["susieglmm","susieglm","susie","mvsusie"],tol=1e-4)
     
-    #need to work more   
+#     #need to work more   
     
-    if(model=="susieglmm")
+#     if(model=="susieglmm")
         
-        T, S = svdK(K;LOCO=LOCO)
+#         T, S = svdK(K;LOCO=LOCO)
        
-        println("Eigen-decomposition is completed.")
+#         println("Eigen-decomposition is completed.")
         
-        est = fineQTL_glmm(G,y,X,X₀,T,S;L=L,Π=Π,LOCO=LOCO,tol=tol)
-            println("SuSiEGLMM is completed.")  
+#         est = fineQTL_glmm(G,y,X,X₀,T,S;L=L,Π=Π,LOCO=LOCO,tol=tol)
+#             println("SuSiEGLMM is completed.")  
         
         
-    elseif(model=="susieglm")
-        est = fineQTL_glm(G,y,X,X₀,L=L,Π=Π,tol=tol)
+#     elseif(model=="susieglm")
+#         est = fineQTL_glm(G,y,X,X₀,L=L,Π=Π,tol=tol)
            
-    else #model=mvsusie
+#     else #model=mvsusie
         
-        println("it is not ready yet.")
+#         println("it is not ready yet.")
         
-    end #model
+#     end #model
         
-    return est
-end
+#     return est
+# end
         
     
         
@@ -426,4 +426,4 @@ function fineMapping1(f::Function,args...;kwargs...)
 end
 
 
-export init, initialization, fineQTL_glmm, susieGLMM, computeT, scoreTest, GenoInfo, gLMM,glmmNull
+export init, initialization, fineQTL_glmm, susieGLMM, computeT, scoreTest, GenoInfo, gLMM
