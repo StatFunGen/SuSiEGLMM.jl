@@ -10,7 +10,8 @@
 
 # using Statistics, LinearAlgebra, Random, StatsBase, Distributions, Distributed
 
-## integration out version based on Peter's derivation
+## include EM's for susie-glm, susie-glmm(H1), glmm's with & w/o integrating β out (H0)
+## integration out version based on "Peter's derivation" in this file 
 
 
 export covarAdj, postG!, emG!, postB!,emB,mStep!,ELBO,emGLMM,emGLM, Result, Approx0, ResGLM
@@ -36,6 +37,7 @@ struct covAdj
  M::Matrix{Float64}
 end
 
+# integrating β out 
 function covarAdj(Xy₀::Vector{Float64},yt::Vector{Float64},Xt₀::Matrix{Float64},Σ₀::Matrix{Float64},ξ::Vector{Float64},n::Int64)
     
     c=size(Xt₀,2); beta=zeros(c); tD=copy(Xt₀'); C=zeros(n,c); M=zeros(n,n)
@@ -59,6 +61,7 @@ function covarAdj(Xy₀::Vector{Float64},yt::Vector{Float64},Xt₀::Matrix{Float
 
 end
 
+#elbo for the integrated β part
 function ELBO(Xy₀::Vector{Float64},β̂::Vector{Float64},Vβ̂inv::Matrix{Float64},Σ₀::Matrix{Float64})
     llbeta= 0.5(Xy₀'*β̂ - logdet(Vβ̂inv)-logdet(Σ₀))# β̂'inv(Σᵦ)β̂ for elbo 
     
@@ -69,7 +72,7 @@ end
 
 #posterior
 
-#g for a full model
+#g for a full model (including susie): H1
 function postG!(ghat::Vector{Float64},Vg::Vector{Float64},λ::Vector{Float64},
 yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{Float64},S::Vector{Float64},
         β::Vector{Float64},τ2::Float64,A0::Matrix{Float64},B0::Matrix{Float64})
@@ -95,13 +98,10 @@ function emG!(ghat2::Vector{Float64},τ2_new::Vector{Float64},Vg::Vector{Float64
     
 end
 
-# g for initial values (H0)
+# g for H0
 function postG!(ghat::Vector{Float64},Vg::Vector{Float64},λ::Vector{Float64},
     yt::Vector{Float64},Xt₀::Matrix{Float64},S::Vector{Float64},β::Vector{Float64},τ2::Float64)
-        
-        
-        # λ[:]= Lambda.(ξ)
-        
+         
         #posterior
         Vg[:]= 1.0./(λ+1.0./(τ2*S))
         
@@ -110,7 +110,7 @@ function postG!(ghat::Vector{Float64},Vg::Vector{Float64},λ::Vector{Float64},
     end
     
 
-# for initial values (H0): integration out version
+# for H0 : integration out version
 function postG!(ghat::Vector{Float64},Vg::Matrix{Float64},Badj::covAdj,S::Vector{Float64},τ2::Float64)
     
     tDA=copy(Badj.tD) #c x n
@@ -142,9 +142,7 @@ function emG!(ghat2::Matrix{Float64},τ2_new::Vector{Float64}, Vg::Matrix{Float6
 end
 
 
-#Xy = getXy(Xt,yt)
-
-
+# susie parts
 # priors : Π,σ0,
 #b's
 #update adding k<l, B1,A1, k>l, B0,A0
@@ -168,8 +166,6 @@ yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{Float64},β::Vector{Float6
 
             B1[:,l] = Diagonal(Sig1[:,l])*Z #posterial b_l
              # compute α_l
-            # A0[:,l] = Π.*exp.(Z./(1.0.+ϕ/σ0[l]))./sqrt.(ϕ.^(-1).+1)
-            # A1[:,l] = log.(Π)+ Z./(1.0.+ϕ/σ0[l]) - 0.5*log.(σ0[l]*ϕ.^(-1).+1)
             A1[:,l] = log.(Π)+ 0.5*Z.^2 .*Sig1[:,l] + 0.5*log.(Sig1[:,l]) 
 
             A1[:,l] = exp.(A1[:,l].-maximum(A1[:,l])) 
@@ -194,7 +190,7 @@ function emB(A1::Matrix{Float64}, B1::Matrix{Float64}, Sig1::Matrix{Float64},L::
         
 end
 
-#for GLM
+#for GLM 
 #b's
 #update adding k<l, B1,A1, k>l, B0,A0
 function postB!(A1::Matrix{Float64}, B1::Matrix{Float64}, Sig1::Matrix{Float64}, λ::Vector{Float64},
@@ -230,12 +226,11 @@ end
 
 
 
-# M-step: H1
+# M-steps: H1 full model, susie glmm
 function mStep!(ξ_new::Vector{Float64},A1::Matrix{Float64},B1::Matrix{Float64},AB2::Matrix{Float64},ghat::Vector{Float64},
     ghat2::Vector{Float64},yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{Float64},β::Vector{Float64},L::Int64)
     
-    # ξ_new= zeros(axes(yt))
-    # β_new= zeros(axes(Xt₀,2))
+    
       U=zeros(L,L)
       ŷ₀ = getXy('N',Xt₀,β)
       AB= getXX('N',Xt,'N',A1.*B1)
@@ -257,7 +252,7 @@ function mStep!(ξ_new::Vector{Float64},A1::Matrix{Float64},B1::Matrix{Float64},
     #    temp[tidx].= 0.000001
     #    temp.= 0.00001
     end
-    # ξ_new[:] = sqrt.(ξ_new + ŷ₀.^2 + ghat2 + 2(ŷ₀ +ghat).*B2+ 2(ŷ₀.*ghat))
+   
       ξ_new[:] = sqrt.(temp)
         
    
@@ -268,11 +263,10 @@ function updateβ!(β_new::Vector{Float64},λ::Vector{Float64},A0::Matrix{Float6
     
     AB= getXX('N',Xt,'N',A0.*B0)
     β_new[:]= symXX('T',(Diagonal(sqrt.(λ))*Xt₀))\getXy('T',Xt₀,(yt- λ.*(sum(AB,dims=2)[:,1]+ghat)))
-  
-    #  β_new[:]= getXX('T',Xt₀,'N',(λ.*Xt₀))\getXy('T',Xt₀,(yt- λ.*(B2 + ghat)))
+
 end
 
-#M-step: H0 for initial values
+#M-steps: H0 (no integration of β)
 function mStep!(ξ_new::Vector{Float64},ghat::Vector{Float64},ghat2::Vector{Float64},Xt₀::Matrix{Float64},β::Vector{Float64})
 
 ŷ₀ = getXy('N',Xt₀,β)
@@ -299,7 +293,7 @@ function updateβ!(β_new::Vector{Float64},λ::Vector{Float64},ghat::Vector{Floa
 end
 
 
-#M-step: H0 for initial values (integration out version)
+#M-step: H0  (integration out version)
 function mStep!(ξ_new::Vector{Float64},Vg::Matrix{Float64},
         ghat::Vector{Float64},Badj::covAdj,Xt₀::Matrix{Float64},n::Int64)
   
@@ -311,7 +305,7 @@ function mStep!(ξ_new::Vector{Float64},Vg::Matrix{Float64},
     
 end
 
-# M-steps for GLM
+# M-steps for GLM 
 function mStep!(ξ_new::Vector{Float64},A1::Matrix{Float64},B1::Matrix{Float64},AB2::Matrix{Float64},
     y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float64},β::Vector{Float64},L::Int64)
 
@@ -341,14 +335,13 @@ function updateβ!(β_new::Vector{Float64},λ::Vector{Float64},A0::Matrix{Float6
 end
 
 
-# for a full model
+# for a H1 full model (susie glmm)
 function ELBO(L::Int64,ξ_new::Vector{Float64},β_new::Vector{Float64},σ0_new::Vector{Float64},τ2_new::Float64,
         A1::Matrix{Float64},B1::Matrix{Float64},AB2::Matrix{Float64},Sig1::Matrix{Float64},Π::Vector{Float64},ghat::Vector{Float64},
         ghat2::Vector{Float64},Vg::Vector{Float64},S::Vector{Float64},yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{Float64})
 
     n=length(yt); lnb =zeros(L);
     
-    #  elbo0= ELBO(ξ_new,β_new,τ2_new,ghat,ghat2,Vg,AB1,S,yt,Xt₀)#null part
      # susie part
      @fastmath @inbounds @views for l= 1: L 
         if(sum(A1[:,l].==0.0)>0) #avoid NaN by log(0)
@@ -364,15 +357,15 @@ function ELBO(L::Int64,ξ_new::Vector{Float64},β_new::Vector{Float64},σ0_new::
 
     ll= sum(log.(logistic.(ξ_new))- 0.5*ξ_new)+ yt'*(getXy('N',Xt₀,β_new) + getXy('N',Xt,sum(A1.*B1,dims=2)[:,1]) + ghat) #lik
     gl = -0.5*(n*log(τ2_new)+ sum(log.(S)-log.(Vg))- 1.0 + sum(ghat2./S)/τ2_new) # g
-     f=open("./test/susie_elbo.txt","a")
-       writedlm(f,[ll gl bl ll+gl-bl])
-     close(f)
+    #  f=open("./test/susie_elbo.txt","a")
+    #    writedlm(f,[ll gl bl ll+gl-bl])
+    #  close(f)
          
     return ll+gl-bl
             
 end
     
-# For initial values : H0 w/o susie (integration out version)
+# For H0  (integration β)
 function ELBO(ξ_new::Vector{Float64},τ2_new::Vector{Float64},Badj::covAdj,ghat::Vector{Float64},
         ghat2::Matrix{Float64},Vg::Matrix{Float64},S::Vector{Float64},
         Xy₀::Vector{Float64},Vβ̂inv::Matrix{Float64},Σ₀::Matrix{Float64},n::Int64)
@@ -384,15 +377,15 @@ function ELBO(ξ_new::Vector{Float64},τ2_new::Vector{Float64},Badj::covAdj,ghat
     # println("τ2_new: $(τ2_new)")
     
     gl = -0.5*(n*log(τ2_new[1])+ sum(log.(S))-logdet(Vg)- 1.0 + tr(ghat2./S)/τ2_new[1]) # g
-    f=open(homedir()*"/GIT/susie-glmm/SuSiEGLMM.jl/test/est_elbocomp.txt","a")
-    writedlm(f,[τ2_new[1] ll lbeta gl ll+gl+lbeta])
-    close(f)
+    # f=open(homedir()*"/GIT/susie-glmm/SuSiEGLMM.jl/test/est_elbocomp.txt","a")
+    # writedlm(f,[τ2_new[1] ll lbeta gl ll+gl+lbeta])
+    # close(f)
 
     return ll+gl+lbeta
     
 end
 
-# for initial values: H0 w/o susie 
+# for  H0 w/o susie 
 function ELBO(ξ_new::Vector{Float64},β_new::Vector{Float64},τ2_new::Float64,ghat::Vector{Float64},
     ghat2::Vector{Float64},Vg::Vector{Float64},S::Vector{Float64},yt::Vector{Float64},Xt₀::Matrix{Float64},n::Int64)
 
@@ -445,13 +438,12 @@ struct Result
     elbo::Float64
     α::Matrix{Float64}
     ν::Matrix{Float64}
-    # ν2::Matrix{Float64}
     Σ::Matrix{Float64}    
 end
     
  
 
-# EM for a full model
+# EM for a H1 full model
 function emGLMM(L::Int64,yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{Float64},S::Vector{Float64},τ2::Float64,
         ξ::Vector{Float64},σ0::Vector{Float64},Π::Vector{Float64};tol::Float64=1e-4)
     
@@ -466,7 +458,7 @@ function emGLMM(L::Int64,yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{F
     
     crit =1.0; el0=0.0;numitr=1
       
-     open("./test/susie_elbo.txt","w")
+    #  open("./test/susie_elbo.txt","w")
     while (crit>=tol)
         ###check again!
          λ[:]= Lambda.(ξ)
@@ -511,7 +503,7 @@ struct Approx0
     elbo::Float64
 end
 
-#EM for initial values (H0)
+#EM for H0
 function emGLMM(yt,Xt₀,S,τ2,ξ;tol::Float64=1e-4)
     
     
@@ -524,7 +516,7 @@ function emGLMM(yt,Xt₀,S,τ2,ξ;tol::Float64=1e-4)
     crit =1.0; el0=0.0;numitr=1
       
     # open("./test/elbo_glmm.txt","w")
-    open(homedir()*"/GIT/susie-glmm/SuSiEGLMM.jl/test/glmm_est.txt","w")
+    # open(homedir()*"/GIT/susie-glmm/SuSiEGLMM.jl/test/glmm_est.txt","w")
     # open("./test/glmm_decElbo.txt","w")
     while (crit>=tol)
         ###check again!
@@ -537,9 +529,9 @@ function emGLMM(yt,Xt₀,S,τ2,ξ;tol::Float64=1e-4)
 
         
          el1=ELBO(ξ_new,β_new,τ2_new[1],ghat,ghat2,Vg,S,yt,Xt₀,n)
-          f= open(homedir()*"/GIT/susie-glmm/SuSiEGLMM.jl/test/glmm_est.txt","a")
-            writedlm(f,[numitr τ2_new β_new el1])
-          close(f)
+        #   f= open(homedir()*"/GIT/susie-glmm/SuSiEGLMM.jl/test/glmm_est.txt","a")
+        #     writedlm(f,[numitr τ2_new β_new el1])
+        #   close(f)
 
         #   if(el0>el1)
         #    fi=open("./test/glmm_decElbo.txt","a")
@@ -558,7 +550,7 @@ function emGLMM(yt,Xt₀,S,τ2,ξ;tol::Float64=1e-4)
     
 end
 
-#EM for initial values (H0): integration out version
+#EM for H0: integration out version
 function emGLMM(yt,Xt₀,S,τ2,ξ,Σ₀;tol::Float64=1e-4)
     
     
@@ -572,7 +564,7 @@ function emGLMM(yt,Xt₀,S,τ2,ξ,Σ₀;tol::Float64=1e-4)
     # Vβ̂inv,Badj = covarAdj(Xy₀,yt,Xt₀,Σ₀,ξ,n)
    
     crit =1.0; el0=0.0;numitr=1
-    open(homedir()*"/GIT/susie-glmm/SuSiEGLMM.jl/test/est_elbocomp.txt","w") 
+    # open(homedir()*"/GIT/susie-glmm/SuSiEGLMM.jl/test/est_elbocomp.txt","w") 
     #  open("./test/decELBO.txt","w")
     while (crit>=tol)
         ###check again!
@@ -609,7 +601,6 @@ struct ResGLM
     elbo::Float64
     α::Matrix{Float64}
     ν::Matrix{Float64}
-    # ν2::Matrix{Float64}
     Σ::Matrix{Float64}    
 end
     

@@ -11,9 +11,9 @@
 # using Statistics, LinearAlgebra, Random, StatsBase, Distributions, Distributed
 
 
+## include only integration out of β for glmms (H0 $ H1:QTL)
 
-
-export intOut,intβOut,emNull
+export intOut,intβOut,emNull,emAlt,glmmNull,glmm1Snp,scan1SNP, guessξ0, Approx
 
 
 function intB!(beta::Vector{Float64},M::Matrix{Float64},
@@ -54,6 +54,7 @@ function intβOut(Xy₀::Vector{Float64},yt::Vector{Float64},Xt₀::Matrix{Float
 
 end
 
+#for recall only
 # function ELBO(Xy₀::Vector{Float64},β̂::Vector{Float64},Vβ̂inv::Matrix{Float64},Σ₀::Matrix{Float64})
 #     llbeta= 0.5(Xy₀'*β̂ - logdet(Vβ̂inv)-logdet(Σ₀))# β̂'inv(Σᵦ)β̂ for elbo 
     
@@ -63,9 +64,9 @@ end
 #E-step
 
 # g for H0: integration out version
-function postG!(ghat::Vector{Float64},Vg::Vector{Float64},Badj::intOut,S::Vector{Float64},τ2::Float64)
+function postG!(ghat::Vector{Float64},Vg::Vector{Float64},Badj::intOut,S::Vector{Float64},τ2::Vector{Float64})
     
-    Vg[:]= 1.0./(Badj.λ+1.0./(τ2*S))
+    Vg[:]= 1.0./(Badj.λ+1.0./(τ2[1]*S))
     # println("pdf of Vg is", isposdef(Vg))
     ghat[:]=Badj.Ŷ
     lmul!(Diagonal(Vg),ghat)
@@ -73,9 +74,9 @@ function postG!(ghat::Vector{Float64},Vg::Vector{Float64},Badj::intOut,S::Vector
 end
 
 # g for QTL 
-function postG!(ghat::Vector{Float64},Vg::Vector{Float64},Badj::intOut,S::Vector{Float64},τ2::Float64,Xt::Vector{Float64},b0::Vector{Float64})
+function postG!(ghat::Vector{Float64},Vg::Vector{Float64},Badj::intOut,S::Vector{Float64},τ2::Vector{Float64},Xt::Vector{Float64},b0::Vector{Float64})
 
-    Vg[:]= 1.0./(Badj.λ+ 1.0./(τ2*S))
+    Vg[:]= 1.0./(Badj.λ+ 1.0./(τ2[1]*S))
     
     ghat[:] = rmul!(Xt[:,:],b0[1])
 
@@ -94,7 +95,7 @@ function postB!(b1::Vector{Float64},σ1::Vector{Float64},Badj::intOut,ghat::Vect
 end
 
 function emB!(b2::Vector{Float64},σ0_new::Vector{Float64},b1::Vector{Float64},σ1::Vector{{Float64}})
-
+# one of them will be deleted later since they are the same each other.
     b2[:] = b1.^2+ σ1
     σ0_new[:].= mean(b2)
     
@@ -149,7 +150,7 @@ function ELBO(ξ_new::Vector{Float64},τ2_new::Vector{Float64},Badj::intOut,ghat
     # println("τ2_new: $(τ2_new)")
     
     gl = -0.5*(n*log(τ2_new[1])+ sum(log.(S)-log.(Vg))- 1.0 + sum(ghat2./S)/τ2_new[1]) # g
-    f=open(homedir()*"/GIT/susie-glmm/SuSiEGLMM.jl/test/est_elbo1.txt","a")
+    f=open(homedir()*"/GIT/susie-glmm/SuSiEGLMM.jl/test/est_elbo0.txt","a")
     writedlm(f,[τ2_new[1] ll lbeta gl ll+gl+lbeta])
     close(f)
 
@@ -171,7 +172,7 @@ function ELBO(ξ_new::Vector{Float64},τ2_new::Vector{Float64},σ0_new::Vector{F
 
 end
 
-
+# for recall only
 # struct Approx0
 #     β::Vector{Float64}
 #     ξ::Vector{Float64}
@@ -195,12 +196,12 @@ function emNull(yt,Xt₀,S,τ2,ξ,Σ₀;tol::Float64=1e-4)
     # Vβ̂inv,Badj = covarAdj(Xy₀,yt,Xt₀,Σ₀,ξ,n)
    
     crit =1.0; el0=0.0;numitr=0
-    open(homedir()*"/GIT/susie-glmm/SuSiEGLMM.jl/test/est_elbo1.txt","w") 
+    open(homedir()*"/GIT/susie-glmm/SuSiEGLMM.jl/test/est_elbo0.txt","w") 
     #  open("./test/decELBO.txt","w")
     while (crit>=tol)
         ###check again!
          Badj= intβOut(Xy₀,yt,Xt₀,Σ₀,ξ,n) 
-         postG!(ghat,Vg,Badj,S,τ2[1])
+         postG!(ghat,Vg,Badj,S,τ2)
          emG!(ghat2,τ2_new,Vg,ghat,S)
          
          mStep!(ξ_new,Vg,ghat,Badj,Xt₀,n)
@@ -227,8 +228,15 @@ end
 
 
 
-## glmm estimation (H0) for score test
-function glmmNull(y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float64},Vector{Float64}},T::Matrix{Float64},
+
+"""
+
+     glmmNull(y::Vector{Float64},X₀::Union{Matrix{Float64},Vector{Float64}},T::Matrix{Float64},S::Vector{Float64};tol=1e-4) 
+     
+     Fitting glmm (H0) for score test
+
+"""
+function glmmNull(y::Vector{Float64},X₀::Union{Matrix{Float64},Vector{Float64}},T::Matrix{Float64},
     S::Vector{Float64};tol=1e-4)
 
     n=length(y)
@@ -237,24 +245,40 @@ function glmmNull(y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float
         X₀ = hcat(ones(n),X₀)
     end
 
-    
-     Xt, Xt₀, yt = rotate(y,X,X₀,T)   
+     Xt₀= rotateX(X₀,T)
+     yt = rotateY(y,T)
 
 #initialization
-    Σ0= 2(cov(Xt₀)+I) # avoid sigularity when only with intercept
-    τ0 = 1.99 
-# τ0=1.2   
-# β0 = glm(X₀,y,Binomial()) |> coef
-    sig0=getXX('N',Σ0,'T',Xt₀)
-    β̂0=getXy('N',sig0,yt)
-    ξ0 =sqrt.(getXy('N',Xt₀,β̂0 ).^2+ Diagonal(getXX('N',Xt₀,'N',sig0).+τ0*S)*ones(n))
-
+     τ0 = 1.99 
+     Σ0= 2(cov(Xt₀)+I) # avoid sigularity when only with intercept   
+     ξ0=guessξ0(yt,Xt₀,S,Σ0,τ0,n)
 
     est0= emNull(yt,Xt₀,S,τ0,ξ0,Σ0;tol=tol)
    
  return est0
 end
 
+## initial values for H0
+function guessξ0(yt::Vector{Float64},Xt₀::Matrix{Float64},S::Vector{Float64},Σ0::Matrix{Float64},τ0::Float64,n::Int64)
+    #initialization
+  sig0=getXX('N',Σ0,'T',Xt₀)
+  β̂0=getXy('N',sig0,yt)
+  ξ0 =sqrt.(getXy('N',Xt₀,β̂0 ).^2+ Diagonal(getXX('N',Xt₀,'N',sig0))*ones(n)+τ0*S)
+
+  return ξ0
+
+end
+
+## initial values for H1
+function guessξ0(yt::Vector{Float64},Xt₀::Matrix{Float64},Xt::Vector{Float64},S::Vector{Float64},Σ0::Matrix{Float64},τ0::Float64,σ_0::Float64,n::Int64)
+    #initialization
+  sig0=getXX('N',Σ0,'T',Xt₀)
+  β̂0=getXy('N',sig0,yt)
+  ξ0 =sqrt.(getXy('N',Xt₀,β̂0 ).^2+ Diagonal(getXX('N',Xt₀,'N',sig0))*ones(n)+σ_0*Xt.^2+τ0*S)
+
+  return ξ0
+
+end
 
 struct Approx
     β::Vector{Float64}
@@ -267,17 +291,15 @@ struct Approx
     elbo::Float64
 end
 
-
-
 ## EM for QTL
-function emAlt(yt,Xt,Xt₀,S,τ2,σ0::Float64,ξ,Σ₀;tol::Float64=1e-4)
+function emAlt(yt,Xt,Xt₀,S,τ2,σ0::Float64,ξ,Σ₀,n::Int64;tol::Float64=1e-4)
     
     
-    n,c=size(Xt₀)
+    # n,c=size(Xt₀)
     ghat =zeros(n); Vg = zeros(n);# λ = zeros(n)##
     
     ghat2=zeros(n); τ2_new=zeros(1); τ2 =[τ2]; 
-    b0=zeros(1); b1=zeros(1); σ0_new =zeros(1); σ0=[σ0]
+    b0=zeros(1); b1=zeros(1);b2=zeros(1); σ0_new =zeros(1); σ0=[σ0]
     ξ_new = zeros(n); 
     
     Xy₀=getXy('T',Xt₀,yt) #X₀'y
@@ -289,7 +311,7 @@ function emAlt(yt,Xt,Xt₀,S,τ2,σ0::Float64,ξ,Σ₀;tol::Float64=1e-4)
     while (crit>=tol)
         ###check again!
          Badj= intβOut(Xy₀,yt,Xt₀,Σ₀,ξ,n) 
-         postG!(ghat,Vg,Badj,S,τ2[1],Xt,b0)
+         postG!(ghat,Vg,Badj,S,τ2,Xt,b0)
          emG!(ghat2,τ2_new,Vg,ghat,S)
          postB!(b1,σ1,Badj,ghat,Xt,σ0)
          emB!(b2,σ0_new,b1,σ1)
@@ -312,5 +334,54 @@ function emAlt(yt,Xt,Xt₀,S,τ2,σ0::Float64,ξ,Σ₀;tol::Float64=1e-4)
     println(numitr)
     return Approx(Badj.β,b1,σ1,ξ,ghat,τ2[1],σ0_new[1],el0)
     
+end
+
+
+# H1 : 1 SNP 
+"""
+
+     glmm1Snp(n,τ0,σ_0,Σ0,yt::Vector{Float64},Xt::Vector{Float64},Xt₀::Union{Matrix{Float64},Vector{Float64}},S::Vector{Float64};tol=1e-4)
+
+    fitting H1 model
+"""
+function glmm1Snp(n,τ0,σ_0,Σ0,yt::Vector{Float64},Xt::Vector{Float64},Xt₀::Union{Matrix{Float64},Vector{Float64}},S::Vector{Float64};tol=1e-4)
+
+    #initialization for ξ 
+    ξ0=guessξ0(yt,Xt₀,Xt,S,Σ0,τ0,σ_0,n)
+    
+    est0= emAlt(yt,Xt,Xt₀,S,τ0,σ_0,ξ0,Σ0,n;tol=tol)
+   
+      return est0
+end
+
+# 
+"""
+
+     scan1SNP(y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float64},Vector{Float64}},T::Matrix{Float64},S::Vector{Float64};tol=1e-4)
+
+     QTLscan by SNP level distributed computation
+
+"""
+function scan1SNP(y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float64},Vector{Float64}},T::Matrix{Float64},
+    S::Vector{Float64};tol=1e-4)
+ 
+    n, nmar =size(X)
+  # check if covariates are added as input and include the intercept. 
+     if(X₀!= ones(n,1)) #&&(size(X₀,2)>1)
+         X₀ = hcat(ones(n),X₀)
+     end
+     # initial values of hyper-prameters
+     τ0 = 1.99; σ_0 = 1.0
+
+            Xt, Xt₀, yt = rotate(y,X,X₀,T)   
+            Σ0= 2(cov(Xt₀)+I) # initial variance of prior β
+         est= @distributed (vcat) for j= nmar
+               est0= glmm1Snp(n,τ0,σ_0,Σ0,yt,Xt[:,j],Xt₀,S;tol=tol)
+                 [est0.ν est0]
+                 end
+ 
+           return est[:,1] est[:,2]
+   
+
 end
 
