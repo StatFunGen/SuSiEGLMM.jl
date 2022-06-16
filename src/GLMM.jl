@@ -127,31 +127,107 @@ return result
 
 end 
 
+#direct computation
+function Score(G::Vector{Float64},y::Vector{Float64},p̂::Vector{Float64})
+  
+       return G'((2y.-1.0)-p̂)
 
-# compute score test statistic : need to check & add score and var in return
-function computeT(init0::Approx0,y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float64})
-    
-        n,m=axes(X); Tstat= zeros(m); ĝ=zeros(n)
-        r₀ =  (2y.-1.0).*(getXy('N',X₀,init0.β)+init0.μ)  
-        p̂ = logistic.(r₀)
-        Γ  = p̂.*(1.0.-p̂)
-        # XX=Xt₀'Diagonal(Γ)
-        proj= I - X₀*(symXX('T',sqrt.(Γ).*X₀)\(X₀'Diagonal(Γ)))
-        # proj = I - Xt₀*(getXX('N',XX,'N',Xt₀))\XX
-        G̃ = getXX('N',proj,'N',X)
-    
-        
-        
-        ĝ = getXy('T',G̃,(y-p̂)).^2
-    
-    #    @fastmath @inbounds @views for j = m
-           for j = m
-              Tstat[j] = ĝ[j]/(G̃[:,j]'*(Γ.*G̃[:,j]))
-           end
-    
-    return Tstat
 end
 
+
+#using projector
+function Score(P₁::Matrix{Float64},W⁻::Vector{Float64},p̂t::Vector{Float64},init0::Approx0,Gt::Vector{Float64},Xt₀::Matrix{Float64},yt::Vector{Float64},n::Int64)
+     
+    scr=eltype(yt)
+   # compute a working vector 
+    ỹ = zeros(n); ỹ[:]= 2yt-p̂t
+    lmul!(Diagonal(W⁻),ỹ)
+    ỹ[:] = getXy('N',Xt₀,init0.β)+init0.μ + ỹ
+ 
+    scr= Gt'BLAS.symv('U',P₁,ỹ)
+
+    return scr
+
+end
+
+function scoreVar(τ2::Float64,W⁻::Vector{Float64},Gt::Vector{Float64},Xt₀::Matrix{Float64},S::Vector{Float64},n::Int64)
+ 
+    P₁ =zeros(n,n); svar=eltype(τ2)
+     X1=copy(Xt₀); X2=similar(X1);X2[:,:]=X1;
+     invΣ̂₁= Diagonal(1.0./(W⁻ +1.0./(τ2*S)))
+     # compute projector
+     lmul!(sqrt.(invΣ̂₁),X1)
+     lmul!(invΣ̂₁,X2)
+    
+      mul!(P₁,X2,symXX('T',X1)\X2')
+      P₁[:,:]=invΣ̂₁- P₁ #transformed complementary projector
+    #   svar = (Gt'P₁)Gt  
+      svar= Gt'BLAS.symv('U',P₁,Gt)
+     return svar, P₁
+end
+
+
+"""
+
+     testStat(init0::Approx0,yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{Float64},S::Vector{Float64})     
+     testStat(init0::Approx0,y::Vector{Float64},X::Vector{Float64},Xt::Vector{Float64},Xt₀::Matrix{Float64},T::Matrix{Float64},S::Vector{Float64})
+
+    Compute score test statistics and p-values (two versions for testing)
+
+"""
+function testStat(init0::Approx0,yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{Float64},S::Vector{Float64})
+   # compute score test statistic using projector 
+        nmar=axes(Xt,2); n =length(y)
+        Tstat= zeros(nmar); #ĝ=zeros(n)
+        
+        # Bernoulli estimates
+        rt₀ = 2yt.*(getXy('N',Xt₀,init0.β)+init0.μ)  # tranformed centered y
+        p̂t = logistic.(rt₀)   
+        W⁻  = 1.0./(p̂t.*(1.0.-p̂t)) #invW
+        
+        # @fastmath @inbounds @views 
+        for j in nmar
+           sVar, P₁ = scoreVar(init0.τ2[1],W⁻,Xt[:,j],Xt₀,S,n)
+           scr = Score(P₁,W⁻,p̂t,init0,Xt[:,j],Xt₀,yt,n)
+           Tstat[j]=scr/sVar
+        end 
+        # XX=Xt₀'Diagonal(Γ)
+        # proj= I - X₀*(symXX('T',sqrt.(Γ).*X₀)\(X₀'Diagonal(Γ)))
+        # G̃ = getXX('N',proj,'N',X) 
+        # ĝ = getXy('T',G̃,(y-p̂)).^2
+    
+    #    @fastmath @inbounds @views for j = m
+        #    for j = m
+        #       Tstat[j] = ĝ[j]/(G̃[:,j]'*(Γ.*G̃[:,j]))
+        #    end
+    
+        p_value = ccdf.(Chisq(1),Tstat)
+    return Tstat, p_value
+end
+
+
+function testStat(init0::Approx0,y::Vector{Float64},X::Vector{Float64},Xt::Vector{Float64},Xt₀::Matrix{Float64},T::Matrix{Float64},S::Vector{Float64})
+  
+    nmar=axes(X,2); n =length(y)
+    Tstat= zeros(nmar);
+      
+        # Bernoulli estimates
+        r₀ =  (2y.-1.0).*(getXy('N',X₀,init0.β)+getXy('T',T,init0.μ))  #non-tranformed centered y
+        p̂ = logistic.(r₀)
+        W⁻  = 1.0./(p̂.*(1.0.-p̂)) #invW
+
+        for j in nmar
+            sVar, _ = scoreVar(init0.τ2[1],W⁻,Xt[:,j],Xt₀,S,n)
+            scr = Score(X[:,j],y,p̂)
+            Tstat[j]=scr/sVar
+         end 
+
+        p_value = ccdf.(Chisq(1),Tstat)
+     
+        return Tstat, p_value
+
+           
+end
 
 
 
@@ -426,4 +502,4 @@ function fineMapping1(f::Function,args...;kwargs...)
 end
 
 
-export init, initialization, fineQTL_glmm, susieGLMM, computeT, scoreTest, GenoInfo, gLMM
+export init, initialization, fineQTL_glmm, susieGLMM, testStat, scoreTest, GenoInfo, gLMM, scoreVar,Score
