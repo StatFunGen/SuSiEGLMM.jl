@@ -105,7 +105,7 @@ end
 function mStep!(ξ_new::Vector{Float64},Vg::Vector{Float64},
         ghat::Vector{Float64},Badj::intOut,Xt₀::Matrix{Float64},n::Int64)
   
-    V=convert(Matrix{Foat64},Diagonal(Vg))
+    V=convert(Matrix{Float64},Diagonal(Vg))
     
    
     ξ_new[:]= sqrt.((getXy('N',Xt₀,Badj.β̂)- getXy('N', Badj.M,ghat)+ ghat).^2 
@@ -168,9 +168,9 @@ function ELBO(ξ_new::Vector{Float64},τ2_new::Vector{Float64},σ0_new::Vector{F
       ll0 = ELBO(ξ_new,τ2_new,Badj,ghat,ghat2,Vg,S,Xy₀,Σ₀,n) #loglik for H0
     #   @fastmath @inbounds @views 
       lb = Badj.Ŷ'*(Xt*b1[1]) - 0.5(log(σ0_new[1])-log(σ1[1])-1.0+b2[1]/σ0_new[1]) #loglik for b
-      f=open(homedir()*"/GIT/susie-glmm/SuSiEGLMM.jl/test/est_elbo1.txt","a")
-    writedlm(f,[τ2_new[1] b1[1] ll0 lb ll0+lb])
-    close(f)
+    #   f=open(homedir()*"/GIT/susie-glmm/SuSiEGLMM.jl/test/est_elbo1.txt","a")
+    # writedlm(f,[τ2_new[1] b1[1] ll0 lb ll0+lb])
+    # close(f)
 
       return ll0+lb
    
@@ -260,7 +260,7 @@ function glmmNull(y::Vector{Float64},X₀::Union{Matrix{Float64},Vector{Float64}
 
     est0= emNull(yt,Xt₀,S,τ0,ξ0,Σ0;tol=tol)
    
- return est0
+ return est0, Xt₀
 end
 
 ## initial values for H0
@@ -312,7 +312,7 @@ function emAlt(yt,Xt,Xt₀,S,τ2,σ0::Float64,ξ,Σ₀,n::Int64,c::Int64;tol::Fl
     # Vβ̂inv,Badj = covarAdj(Xy₀,yt,Xt₀,Σ₀,ξ,n)
    
     crit =1.0; el0=0.0;numitr=0
-    open(homedir()*"/GIT/susie-glmm/SuSiEGLMM.jl/test/est_elbo1.txt","w") 
+    # open(homedir()*"/GIT/susie-glmm/SuSiEGLMM.jl/test/est_elbo1.txt","w") 
     #  open("./test/decELBO.txt","w")
     while (crit>=tol)
         ###check again!
