@@ -8,7 +8,7 @@ Seed(20)
 cidx = collect(1:4); Stime=[]; Qtime=[]
 for j= 2:1000
   # data preparation
-  geno= readdlm(string(@__DIR__,"/sim",j,"/fam_sample_",j,".csv"),'\t';skipstart=1)[:,6:end]; # read genotype randomizeData
+  geno= readdlm(string(@__DIR__,"/sim",j,"/fam_sample_",j,".csv"),'\t';skipstart=1)[:,6:end]; # read genotype 
   info = readdlm(string(@__DIR__,"/sim",j,"/fam_drop_chr4.bim"))  # get chr idx
   
      for l=axes(geno,2) #imputation
@@ -29,7 +29,7 @@ for j= 2:1000
       
     #score test
     ts =@elapsed begin
-    STEST= @distributed (vcat)  for l =1:3
+         STEST= @distributed (vcat)  for l =1:3
          idx=findall(info[:,1].== cidx[l])
          tstats, pvals, scores, svars = scoreTest(K[:,:,l],trait,geno[:,idx])
          [tstats pvals scores svars]
@@ -48,7 +48,7 @@ for j= 2:1000
          b̂,est0 = scan1SNP(trait,geno[:,idx],ones(n,1),T[:,:,l],S[:,l])  
          bv= @distributed (vcat)  for t in eachindex(idx)
                       est0[t].σ1
-          end
+               end
           B̄[idx] = b̄; Bvar[idx]=bv
        end
 
@@ -57,9 +57,9 @@ for j= 2:1000
         bv= @distributed (vcat) for t =1:length(b̂)
                  est0[t].σ1
             end
-      B̄[idx4:end]=b̂; Bvar[idx4:end]=bv
+        B̄[idx4:end]=b̂; Bvar[idx4:end]=bv
      end
        writedlm(string(@__DIR__,"/sim",j,"/fam_tstat_bhat_postvar.txt"),[B̄ Bvar])
        Qtime=[Qtime;ts1]
 end
-writedlm(string(@__DIR__,"/fam_min_median_max_time_score_qtl.txt",[minimum(Stime) median(Stime) maximum(Stime);minimum(Qtime) median(Qtime) maximum(Qtime)])
+writedlm(string(@__DIR__,"/fam_min_median_max_time_score_qtl.txt"),[minimum(Stime) median(Stime) maximum(Stime);minimum(Qtime) median(Qtime) maximum(Qtime)])
