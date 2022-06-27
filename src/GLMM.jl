@@ -50,7 +50,7 @@ Returns initial values for parameters `τ2, β, ξ` to run fine-mapping for SuSi
 
 """
 function initialization(y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float64},Vector{Float64}},T::Matrix{Float64},
-        S::Vector{Float64};tol=1e-4)
+        S::Vector{Float64};tol=1e-4,τ0::Float64 = 1.99 )
     
         n=length(y)
     # check if covariates are added as input and include the intercept. 
@@ -63,7 +63,7 @@ function initialization(y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix
    
     #initialization
      Σ0= 2(cov(Xt₀)+I) # avoid sigularity when only with intercept
-     τ0 = 1.99 
+     
     # τ0=1.2   
     # β0 = glm(X₀,y,Binomial()) |> coef
     sig0=getXX('N',Σ0,'T',Xt₀)
@@ -78,7 +78,7 @@ end
 
 #glmm : no integration out
 function gLMM(y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float64},Vector{Float64}},T::Matrix{Float64},
-    S::Vector{Float64};tol=1e-4)
+    S::Vector{Float64};tol=1e-4,τ²::Float64 = 1.99 )
 
     n=length(y)
 # check if covariates are added as input and include the intercept. 
@@ -89,7 +89,7 @@ function gLMM(y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float64},
     Xt, Xt₀, yt = rotate(y,X,X₀,T)   
 
 #initialization
-    τ² = 1.99 
+    
     β0 = glm(X₀,y,Binomial()) |> coef
     ξ0 =sqrt.(getXy('N',Xt₀,β0).^2+ τ²*S)
 
@@ -105,7 +105,7 @@ end
 
 # no integrating β out 
 function susieGLMM(L::Int64,Π::Vector{Float64},y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float64},Vector{Float64}},T::Matrix{Float64},
-    S::Vector{Float64};tol=1e-4)
+    S::Vector{Float64};tol=1e-4,τ0::Float64 = 1.99, σ0::Vector{Float64} = ones(L) )
    
 # check if covariates are added as input and include the intercept. 
      n=length(y) 
@@ -115,8 +115,8 @@ function susieGLMM(L::Int64,Π::Vector{Float64},y::Vector{Float64},X::Matrix{Flo
 
     Xt, Xt₀, yt = rotate(y,X,X₀,T)   
     # #initialization :
-    σ0 = ones(L); 
-    τ0 = 1.99  
+   
+     
     β0 = glm(X₀,y,Binomial()) |> coef 
     ν0 =sum(repeat(Π,outer=(1,L)).*σ0',dims=2)[:,1] ; #ν²0
     ξ0 =sqrt.(getXy('N',Xt.^2.0,ν0)+ getXy('N',Xt₀,β0).^2+ τ0*S )

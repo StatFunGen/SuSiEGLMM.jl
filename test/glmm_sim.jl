@@ -12,9 +12,9 @@ for j= 2:1000
   info = readdlm(string(@__DIR__,"/sim",j,"/fam_drop_chr4.bim"))  # get chr idx
   
      for l=axes(geno,2) #imputation
-        idx = findall(geno[:,l].=="NA")
-         geno[idx,l].= missing
-         geno[idx,l] .= mean(skipmissing(geno[:,l]))
+        idx1 = findall(geno[:,l].=="NA")
+         geno[idx1,l].= missing
+         geno[idx1,l] .= mean(skipmissing(geno[:,l]))
      end
      geno = convert(Matrix{Float64},geno)
      trait =geno[:,end]
@@ -44,12 +44,12 @@ for j= 2:1000
      B̄=zeros(p);Bvar=zeros(p) 
      ts1=@elapsed begin
        for l=1:3
-         idx=findall(info[:,1].== cidx[l])
-         b̂,est0 = scan1SNP(trait,geno[:,idx],ones(n,1),T[:,:,l],S[:,l])  
-         bv= @distributed (vcat)  for t in eachindex(idx)
+         idx1=findall(info[:,1].== cidx[l])
+         b̂,est0 = scan1SNP(trait,geno[:,idx1],ones(n,1),T[:,:,l],S[:,l])  
+         bv= @distributed (vcat)  for t in eachindex(idx1)
                       est0[t].σ1
                end
-          B̄[idx] = b̄; Bvar[idx]=bv
+          B̄[idx1] = b̂; Bvar[idx1]=bv
        end
 
       #for chr4
