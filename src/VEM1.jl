@@ -73,6 +73,21 @@ function postG!(ghat::Vector{Float64},Vg::Vector{Float64},Badj::intOut,S::Vector
     
 end
 
+# g for susieglmm
+function postG!(ghat::Vector{Float64},Vg::Vector{Float64},Badj::intOut,
+         Xt::Matrix{Float64},S::Vector{Float64},τ2::Vector{Float64},A0::Matrix{Float64},B0::Matrix{Float64})
+        
+        
+        #posterior
+        Vg[:]= 1.0./(Badj.λ+1.0./(τ2[1]*S))
+        
+        ghat[:]= getXy('N',Xt,sum(A0.*B0,dims=2)[:,1])
+        ghat[:]= Badj.Ŷ -lmul!(Diagonal(Badj.λ),ghat)
+        lmul!(Diagonal(Vg),ghat)
+        
+        
+    end
+
 # g for QTL 
 function postG!(ghat::Vector{Float64},Vg::Vector{Float64},Badj::intOut,S::Vector{Float64},τ2::Vector{Float64},Xt::Vector{Float64},b0::Vector{Float64})
 
@@ -101,15 +116,54 @@ function emB!(b2::Vector{Float64},σ0_new::Vector{Float64},b1::Vector{Float64},�
     
 end
 
+
+# susie-glmm: α,b=∑b_l update
+function postB!(A1::Matrix{Float64}, B1::Matrix{Float64}, Sig1::Matrix{Float64},Badj::intOut,ghat::Vector{Float64},
+    Xt::Matrix{Float64},σ0::Vector{Float64},A0::Matrix{Float64},B0::Matrix{Float64},Π::Vector{Float64},L::Int64)
+        
+        nidx, pidx = axes(Xt)
+        pidx=axes(B0,1)
+        ϕ⁻  = zeros(pidx); Z0=zeros(pidx);
+        
+        # Z0= similar(Z, nidx);
+        
+        ϕ⁻ = getXy('T', Xt.^2,Badj.λ) # mle of precision
+        AB0= A0.*B0;  # #old α_l*b_l
+        
+                Sig1[:,:] =  1.0./(1.0./σ0'.+ ϕ⁻ )
+        
+         for l= 1: L
+                 
+                Z0[:]= getXy('N',Xt,sum(dropCol(AB0,l),dims=2)[:,1])+ghat
+                lmul!(Diagonal(Badj.λ),Z0)
+                Z0[:]= Badj.Ŷ- Z0
+                Z0[:]= getXy('T',Xt,Z0)
+            
+                 # compute α_l
+                A1[:,l] = log.(Π)+ 0.5*Z0.^2 .*Sig1[:,l] + 0.5*log.(Sig1[:,l]) 
+                A1[:,l] = exp.(A1[:,l].-maximum(A1[:,l])) 
+                A1[:,l] = A1[:,l]/sum(A1[:,l])
+                 #posterial b_l
+                lmul!(Diagonal(Sig1[:,l]),Z0) 
+                B1[:,l] = Z0 
+                AB0[:,l]= A1[:,l].*Z0
+          end
+        
+    end
+
+
 #M-step: H0  (integration out version)
 function mStep!(ξ_new::Vector{Float64},Vg::Vector{Float64},
         ghat::Vector{Float64},Badj::intOut,Xt₀::Matrix{Float64},n::Int64)
-  
-    V=convert(Matrix{Float64},Diagonal(Vg))
     
-   
-    ξ_new[:]= sqrt.((getXy('N',Xt₀,Badj.β̂)- getXy('N', Badj.M,ghat)+ ghat).^2 
-    + Diagonal(symXX('N',Badj.M.*sqrt.(Vg))+ V+ BLAS.symm('R','U',(Diagonal(1.0./Badj.λ)-2V),Badj.M))*ones(n))
+    V=zeros(n,n)
+    V[:,:]=Diagonal(Vg)
+    
+    V[:,:] = Diagonal(symXX('N',Badj.M.*sqrt.(Vg))+V+BLAS.symm('R','U',(Diagonal(1.0./Badj.λ)-2V),Badj.M))
+    ξ_new[:]= (getXy('N',Xt₀,Badj.β̂) + getXy('N', I-Badj.M,ghat)).^2  
+    ξ_new[:] = sqrt.(ξ_new + getXy('N',V,ones(n)))
+
+    # + Diagonal(symXX('N',Badj.M.*sqrt.(Vg))+ V+ BLAS.symm('R','U',(Diagonal(1.0./Badj.λ)-2V),Badj.M))*ones(n)
      
     
     # M= symXX('N',rmul!(M,Diagonal(sqrt.(Vg))) + Diagonal(Vg)
@@ -125,17 +179,38 @@ function mStep!(ξ_new::Vector{Float64},b1::Vector{Float64},σ1::Vector{Float64}
      rmul!(mu,b1[1])
      mu[:] = mu + ghat
      
-     Sig = convert(Matrix{Float64}, Diagonal(Vg))
-     Sig = convert(Matrix{Float64},Symmetric(BLAS.syr!('U',σ1[1],Xt,Sig)))
+     Sig= zeros(n,n)
+     Sig[:,:] = Diagonal(Vg)
+     Sig[:,:] = Symmetric(BLAS.syr!('U',σ1[1],Xt,Sig))
                 
     mul!(M1,BLAS.symm('R','U',Sig,Badj.M),Badj.M') #M*Sig*M'      
-
-    ξ_new[:]= sqrt.((getXy('N',Xt₀,Badj.β̂)- getXy('N', Badj.M,mu)+ mu).^2 
-                + Diagonal(M1+BLAS.symm('R','U',Diagonal(1.0./Badj.λ)-2Sig,Badj.M)+Sig)*ones(n) )
+    M1[:,:] = Diagonal(M1+BLAS.symm('R','U',Diagonal(1.0./Badj.λ)-2Sig,Badj.M)+Sig)
+    ξ_new[:]= (getXy('N',Xt₀,Badj.β̂)+ getXy('N',I- Badj.M,mu)).^2 
+    ξ_new[:] = sqrt.(ξ_new + getXy('N',M1,ones(n)))
+    
+    # ξ_new[:]= sqrt.((getXy('N',Xt₀,Badj.β̂)+ getXy('N',I- Badj.M,mu)).^2 
+                # + Diagonal(M1+BLAS.symm('R','U',Diagonal(1.0./Badj.λ)-2Sig,Badj.M)+Sig)*ones(n) )
                 
 
 end
 
+# ξ for susie-glmm
+function mStep!(ξ_new::Vector{Float64},A1::Matrix{Float64},B1::Matrix{Float64},Sig1::Matrix{Float64},ghat::Vector{Float64},
+    Vg::Vector{Float64},Badj::intOut,Xt::Matrix{Float64},Xt₀::Matrix{Float64},n::Int64)
+    
+     ω = zeros(n); M1=zeros(n,n); Ω=zeros(n,n)
+      
+     ω[:] = getXy('N',Xt, sum(A1.*B1,dims=2)[:,1]) + ghat  
+     Ω[:,:] = symXX('N',Xt.*sqrt.(sum(A1.*Sig1,dims=2)[:,1])) + Diagonal(Vg)
+    
+     mul!(M1,BLAS.symm('R','U',Ω,Badj.M),Badj.M') #MΩM'
+     M1[:,:] = Diagonal(M1+BLAS.symm('R','U',Diagonal(1.0./Badj.λ)-2Ω,Badj.M)+Ω)
+     ξ_new[:]= (getXy('N',Xt₀,Badj.β̂)+ getXy('N',I-Badj.M,ω)).^2 
+     ξ_new[:] = sqrt.(ξ_new + getXy('N',M1,ones(n)))
+    #  ξ_new[:]=ξ_new + lmul!(Diagonal(M1+BLAS.symm('R','U',Diagonal(1.0./Badj.λ)-2Ω,Badj.M)+Ω),ones(n))
+    #  ξ_new[:]=sqrt.(ξ_new)   
+   
+end
 
     
 # For H0 (integration out version)
@@ -174,6 +249,38 @@ function ELBO(ξ_new::Vector{Float64},τ2_new::Vector{Float64},σ0_new::Vector{F
 
       return ll0+lb
    
+
+end
+
+function ELBO(ξ_new::Vector{Float64},σ0_new::Vector{Float64},τ2_new::Float64,Badj::intOut,
+    A1::Matrix{Float64},B1::Matrix{Float64},AB2::Matrix{Float64},Sig1::Matrix{Float64},Π::Vector{Float64},ghat::Vector{Float64},
+    ghat2::Vector{Float64},Vg::Vector{Float64},S::Vector{Float64},Xt::Matrix{Float64},L::Int64,n::Int64)
+
+   lnb =zeros(L);
+    
+    # susie part
+    @fastmath @inbounds @views for l= 1: L 
+       if(sum(A1[:,l].==0.0)>0) #avoid NaN by log(0)
+           lnb[l] = 0.0
+       else
+           lnb[l]  = A1[:,l]'*(log.(A1[:,l])-log.(Π) - 0.5*log.(Sig1[:,l])) +0.5*sum(AB2[:,l])/σ0_new[l]
+           
+       end
+   end
+   
+   bl= sum(lnb)+0.5*(sum(log.(σ0_new))- L) 
+  
+    #loglik H0 + extra term b_l
+   ll0 = ELBO(ξ_new,τ2_new,Badj,ghat,ghat2,Vg,S,Xy₀,Σ₀,n)+Badj.Ŷ'*getXy('N',Xt,sum(A1.*B1,dims=2)[:,1])
+
+    # #  f=open("./test/susie_elbo.txt","a")
+    #    writedlm(f,[ll gl bl ll+gl-bl])
+    #  close(f)
+         
+    return ll0-bl
+            
+
+
 
 end
 
@@ -242,7 +349,7 @@ end
 
 """
 function glmmNull(y::Vector{Float64},X₀::Union{Matrix{Float64},Vector{Float64}},T::Matrix{Float64},
-    S::Vector{Float64};tol=1e-4)
+    S::Vector{Float64};tol=1e-4,τ0::Float64 = 1.99 )
 
     n=length(y)
 # check if covariates are added as input and include the intercept. 
@@ -254,7 +361,7 @@ function glmmNull(y::Vector{Float64},X₀::Union{Matrix{Float64},Vector{Float64}
      yt = rotateY(y,T)
 
 #initialization
-     τ0 = 1.99 
+     
      Σ0= 2(cov(Xt₀)+I) # avoid sigularity when only with intercept   
      ξ0=guessξ0(yt,Xt₀,S,Σ0,τ0,n)
 
@@ -369,7 +476,7 @@ end
 
 """
 function scan1SNP(y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float64},Vector{Float64}},T::Matrix{Float64},
-    S::Vector{Float64};tol=1e-4)
+    S::Vector{Float64};tol=1e-4,τ0::Float64 = 1.99; σ_0::Float64 = 1.0)
  
     nmar =axes(X,2);n,c=size(X₀)
   # check if covariates are added as input and include the intercept. 
@@ -377,7 +484,7 @@ function scan1SNP(y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float
          X₀ = hcat(ones(n),X₀)
      end
      # initial values of hyper-prameters
-     τ0 = 1.99; σ_0 = 1.0
+     
     #  est=zeros(nmar,2)
             Xt, Xt₀, yt = rotate(y,X,X₀,T)   
             Σ0= 2(cov(Xt₀)+I) # initial variance of prior β
@@ -388,5 +495,58 @@ function scan1SNP(y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float
  
            return est[:,1], est[:,2]
 
+end
+
+
+#EM for susie-glmm
+function emSusie(yt,Xt,Xt₀,S,τ2,σ0::Vector{Float64},ξ,Σ₀,Π::Vector{Float64},L::Int64,n::Int64,p::Int64,c::Int64;tol::Float64=1e-4)
+    
+    # n,c=size(Xt₀)
+    ghat =zeros(n); Vg = zeros(n);# λ = zeros(n)##
+    ghat2=zeros(n); τ2_new=zeros(1); τ2 =[τ2]; 
+    
+    βhat=zeros(c)
+    A0 =repeat(Π,outer=(1,L)) ; 
+    B0=zeros(p,L); AB2=zeros(p,L)
+   
+    A1 =copy(A0); B1=zeros(p,L); Sig1=zeros(p,L)
+    σ0_new = zeros(L); ξ_new = zeros(n);
+
+
+
+    Xy₀=getXy('T',Xt₀,yt) #X₀'y
+    # Vβ̂inv,Badj = covarAdj(Xy₀,yt,Xt₀,Σ₀,ξ,n)
+   
+    crit =1.0; el0=0.0;numitr=0
+    # open(homedir()*"/GIT/susie-glmm/SuSiEGLMM.jl/test/est_elbo1.txt","w") 
+    #  open("./test/decELBO.txt","w")
+    while (crit>=tol)
+        ###check again!
+         Badj= intβOut(Xy₀,yt,Xt₀,Σ₀,ξ,n) 
+         postG!(ghat,Vg,Badj,Xt,S,τ2,A0,B0)
+         emG!(ghat2,τ2_new,Vg,ghat,S)
+         postB!(A1, B1, Sig1,Badj,ghat,Xt,σ0,A0,B0,Π,L)
+         σ0_new, AB2 = emB(A1, B1, Sig1,L)
+         mStep!(ξ_new,A1,B1,Sig1,ghat,Vg,Badj,Xt,Xt₀,n)
+
+         el1=ELBO(ξ_new,σ0_new,τ2_new,Badj,A1,B1,AB2,Sig1,Π,ghat,ghat2,Vg,S,Xt,L,n)
+     
+        #  if(el0>el1)
+        #   f=open("./test/decELBO.txt","a")
+        #     writedlm(f,[numitr τ2_new el1 el1-el0])
+        #   close(f)
+        #  end
+         crit=abs(el1-el0)
+        #  crit=norm(ξ_new-ξ)+norm(τ2_new-τ2)+abs(el1-el0)  
+        
+         ξ=ξ_new; τ2=τ2_new;el0=el1;σ0=σ0_new;βhat=Badj.β̂;
+         A0[:,:]=A1;B0[:,:]=B1
+        
+          numitr +=1        
+    end
+    println(numitr)
+
+    return Result(ξ,βhat,σ0,τ2,el0,A0, B0, Sig1)
+    
 end
 
