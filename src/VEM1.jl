@@ -13,7 +13,7 @@
 
 ## include only integration out of β for glmms (H0 $ H1:QTL)
 
-export intOut,intβOut,emNull,emAlt,glmmNull,glmm1Snp, guessξ0, Approx, scan1SNP
+export intOut,intβOut,emNull,emAlt,glmmNull,glmm1Snp, guessξ0, Approx, scan1SNP, emSusie, glmmSusie, selectQTL
 
 
 function intB!(beta::Vector{Float64},M::Matrix{Float64},
@@ -38,13 +38,14 @@ end
 function intβOut(Xy₀::Vector{Float64},yt::Vector{Float64},Xt₀::Matrix{Float64},Σ₀::Matrix{Float64},ξ::Vector{Float64},n::Int64)
     
     c=size(Xt₀,2); beta=zeros(c); tD=copy(Xt₀'); M=zeros(n,n)
+    Vβ̂inv = zeros(c,c)
     λ= Lambda.(ξ) #2Lambda
 
     # Xy₀=getXy('T',Xt₀,yt) #X₀'y
     
     # Vβ̂inv= inv(Σ₀)+ BLAS.gemm('N','N',rmul!(tD,λ),Xt₀)  # Σ₀^-₁ +(tD=X₀'*λ)*X₀ :precision Σᵦ
     Λ=Diagonal(sqrt.(λ))
-    Vβ̂inv= inv(Σ₀)+ symXX('N',rmul!(tD,Λ)) #forcing to be symmetric
+    Vβ̂inv[:,:]= inv(Σ₀)+ symXX('N',rmul!(tD,Λ)) #forcing to be symmetric
     rmul!(tD,Λ)
     intB!(beta,M,Vβ̂inv,Xy₀,tD,Xt₀)
    
@@ -123,7 +124,7 @@ function postB!(A1::Matrix{Float64}, B1::Matrix{Float64}, Sig1::Matrix{Float64},
         
         nidx, pidx = axes(Xt)
         pidx=axes(B0,1)
-        ϕ⁻  = zeros(pidx); Z0=zeros(pidx);
+        ϕ⁻  = zeros(pidx); Z0=zeros(nidx); Z=zeros(pidx)
         
         # Z0= similar(Z, nidx);
         
@@ -137,16 +138,16 @@ function postB!(A1::Matrix{Float64}, B1::Matrix{Float64}, Sig1::Matrix{Float64},
                 Z0[:]= getXy('N',Xt,sum(dropCol(AB0,l),dims=2)[:,1])+ghat
                 lmul!(Diagonal(Badj.λ),Z0)
                 Z0[:]= Badj.Ŷ- Z0
-                Z0[:]= getXy('T',Xt,Z0)
+                Z[:]= getXy('T',Xt,Z0)
             
                  # compute α_l
-                A1[:,l] = log.(Π)+ 0.5*Z0.^2 .*Sig1[:,l] + 0.5*log.(Sig1[:,l]) 
+                A1[:,l] = log.(Π)+ 0.5*Z.^2 .*Sig1[:,l] + 0.5*log.(Sig1[:,l]) 
                 A1[:,l] = exp.(A1[:,l].-maximum(A1[:,l])) 
                 A1[:,l] = A1[:,l]/sum(A1[:,l])
                  #posterial b_l
-                lmul!(Diagonal(Sig1[:,l]),Z0) 
-                B1[:,l] = Z0 
-                AB0[:,l]= A1[:,l].*Z0
+                lmul!(Diagonal(Sig1[:,l]),Z) 
+                B1[:,l] = Z 
+                AB0[:,l]= A1[:,l].*Z
           end
         
     end
@@ -198,10 +199,12 @@ end
 function mStep!(ξ_new::Vector{Float64},A1::Matrix{Float64},B1::Matrix{Float64},Sig1::Matrix{Float64},ghat::Vector{Float64},
     Vg::Vector{Float64},Badj::intOut,Xt::Matrix{Float64},Xt₀::Matrix{Float64},n::Int64)
     
-     ω = zeros(n); M1=zeros(n,n); Ω=zeros(n,n)
+     ω = zeros(n); M1=zeros(n,n); Ω=zeros(n,n);M0=copy(Xt)
       
      ω[:] = getXy('N',Xt, sum(A1.*B1,dims=2)[:,1]) + ghat  
-     Ω[:,:] = symXX('N',Xt.*sqrt.(sum(A1.*Sig1,dims=2)[:,1])) + Diagonal(Vg)
+     rmul!(M0,Diagonal(sqrt.(sum(A1.*Sig1,dims=2)[:,1])))
+    #  Xt.*sqrt.(sum(A1.*Sig1,dims=2)[:,1])'
+     Ω[:,:] = symXX('N',M0) + Diagonal(Vg)
     
      mul!(M1,BLAS.symm('R','U',Ω,Badj.M),Badj.M') #MΩM'
      M1[:,:] = Diagonal(M1+BLAS.symm('R','U',Diagonal(1.0./Badj.λ)-2Ω,Badj.M)+Ω)
@@ -252,9 +255,10 @@ function ELBO(ξ_new::Vector{Float64},τ2_new::Vector{Float64},σ0_new::Vector{F
 
 end
 
-function ELBO(ξ_new::Vector{Float64},σ0_new::Vector{Float64},τ2_new::Float64,Badj::intOut,
+#for susie-glmm
+function ELBO(ξ_new::Vector{Float64},σ0_new::Vector{Float64},τ2_new::Vector{Float64},Badj::intOut,
     A1::Matrix{Float64},B1::Matrix{Float64},AB2::Matrix{Float64},Sig1::Matrix{Float64},Π::Vector{Float64},ghat::Vector{Float64},
-    ghat2::Vector{Float64},Vg::Vector{Float64},S::Vector{Float64},Xt::Matrix{Float64},L::Int64,n::Int64)
+    ghat2::Vector{Float64},Vg::Vector{Float64},S::Vector{Float64},Xt::Matrix{Float64},Xy₀::Vector{Float64},Σ₀::Matrix{Float64},L::Int64,n::Int64)
 
    lnb =zeros(L);
     
@@ -392,6 +396,19 @@ function guessξ0(yt::Vector{Float64},Xt₀::Matrix{Float64},Xt::Vector{Float64}
 
 end
 
+## initial values for susie-glmm
+function guessξ0(yt::Vector{Float64},Xt₀::Matrix{Float64},Xt::Matrix{Float64},S::Vector{Float64},Σ0::Matrix{Float64},τ0::Float64,σ_0::Vector{Float64},Π::Vector{Float64},n::Int64,L::Int64)
+
+    sig0=getXX('N',Σ0,'T',Xt₀)
+    β̂0=getXy('N',sig0,yt)
+    ν0 = getXy('N',repeat(Π,outer=(1,L)),σ_0); #ν²0
+    ξ0 =sqrt.(getXy('N',Xt₀,β̂0).^2+ Diagonal(getXX('N',Xt₀,'N',sig0))*ones(n)+getXy('N',Xt.^2.0,ν0)+ τ0*S )
+
+    return ξ0
+
+end
+
+
 struct Approx
     β::Vector{Float64}
     ν::Vector{Float64}
@@ -476,7 +493,7 @@ end
 
 """
 function scan1SNP(y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float64},Vector{Float64}},T::Matrix{Float64},
-    S::Vector{Float64};tol=1e-4,τ0::Float64 = 1.99; σ_0::Float64 = 1.0)
+    S::Vector{Float64};tol=1e-4,τ0::Float64 = 1.99, σ_0::Float64 = 1.0)
  
     nmar =axes(X,2);n,c=size(X₀)
   # check if covariates are added as input and include the intercept. 
@@ -529,7 +546,7 @@ function emSusie(yt,Xt,Xt₀,S,τ2,σ0::Vector{Float64},ξ,Σ₀,Π::Vector{Floa
          σ0_new, AB2 = emB(A1, B1, Sig1,L)
          mStep!(ξ_new,A1,B1,Sig1,ghat,Vg,Badj,Xt,Xt₀,n)
 
-         el1=ELBO(ξ_new,σ0_new,τ2_new,Badj,A1,B1,AB2,Sig1,Π,ghat,ghat2,Vg,S,Xt,L,n)
+         el1=ELBO(ξ_new,σ0_new,τ2_new,Badj,A1,B1,AB2,Sig1,Π,ghat,ghat2,Vg,S,Xt,Xy₀,Σ₀,L,n)
      
         #  if(el0>el1)
         #   f=open("./test/decELBO.txt","a")
@@ -546,7 +563,70 @@ function emSusie(yt,Xt,Xt₀,S,τ2,σ0::Vector{Float64},ξ,Σ₀,Π::Vector{Floa
     end
     println(numitr)
 
-    return Result(ξ,βhat,σ0,τ2,el0,A0, B0, Sig1)
+    return Result(ξ,βhat,σ0,τ2[1],el0,A0, B0, Sig1)
     
 end
 
+
+
+
+"""
+
+     glmmSusie(y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float64},Vector{Float64}},T::Matrix{Float64},
+          S::Vector{Float64};tol=1e-4,τ²::Float64 = 1.99,L::Int64=10,Π::Vector{Float64}=ones(size(X,2))/size(X,2),σ0::Vector{Float64} = ones(L))
+
+
+     Fit a logistic mixed model for SUSIE (sum of single effects).  Returns a type of `Result`, struct of arrays.
+
+"""
+function glmmSusie(y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float64},Vector{Float64}},T::Matrix{Float64},
+    S::Vector{Float64};tol=1e-4,τ²::Float64 = 1.99,L::Int64=10,Π::Vector{Float64}=ones(size(X,2))/size(X,2),σ0::Vector{Float64} = ones(L))
+
+    n,c=size(X₀); p=size(X,2)
+  # check if covariates are added as input and include the intercept. 
+     if (X₀!= ones(n,1)) 
+         X₀ = hcat(ones(n),X₀)
+     end
+
+      # check the size of prior probabilities
+      if (length(Π)!= size(X,2))
+        println("Error. The length of Π should match $(size(X,2)) SNPs!")
+      end
+      
+      # transforming data
+         Xt, Xt₀, yt = rotate(y,X,X₀,T) 
+     
+       # initial values of hyper-prameters
+             
+         Σ0= 2(cov(Xt₀)+I) # initial variance of prior β
+         ξ0=guessξ0(yt,Xt₀,Xt,S,Σ0,τ²,σ0,Π,n,L)
+
+         result= emSusie(yt,Xt,Xt₀,S,τ²,σ0,ξ0,Σ0,Π,L,n,p,c;tol=tol)
+
+           return result
+end
+
+
+
+"""
+   
+     selectQTL(K::Matrix{Float64},y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float64},Vector{Float64}},LOCO::Bool=false
+               ;tol=1e-4,τ0::Float64 = 1.99,L::Int64=10,Π::Vector{Float64}=ones(size(X,2))/size(X,2),σ0::Vector{Float64} = ones(L))
+
+
+      Fitting a logistic mixed model for SUSIE (sum of single effects).   SVD step included.
+
+
+"""
+function selectQTL(K::Matrix{Float64},y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float64},Vector{Float64}},LOCO::Bool=false
+         ;tol=1e-4,τ0::Float64 = 1.99,L::Int64=10,Π::Vector{Float64}=ones(size(X,2))/size(X,2),σ0::Vector{Float64} = ones(L))
+
+
+    T, S = svdK(K;LOCO=LOCO)
+    
+    Res = glmmSusie(y,X,X₀,T,S;tol=tol,τ²=τ0,L=L,Π=Π,σ0=σ0)
+
+    return Res
+
+
+end
