@@ -482,7 +482,7 @@ function emGLMM(L::Int64,yt::Vector{Float64},Xt::Matrix{Float64},Xt₀::Matrix{F
          #check later for performance
         #crit=norm(ξ_new-ξ)+norm(β_new-β)+abs(τ2_new-τ2)+norm(B1-B0)+norm(σ0_new-σ0)
          
-         ξ=ξ_new;σ0=σ0_new; τ2=τ2_new[1];el0=el1;A0[:,:]=A1;B0[:,:]=B1
+         ξ[:]=ξ_new;σ0[:]=σ0_new; τ2=τ2_new[1];el0=el1;A0[:,:]=A1;B0[:,:]=B1
         
           numitr +=1
         
@@ -584,7 +584,7 @@ function emGLMM(yt,Xt₀,S,τ2,ξ,Σ₀;tol::Float64=1e-4)
          crit=abs(el1-el0)
         #  crit=norm(ξ_new-ξ)+norm(τ2_new-τ2)+abs(el1-el0)  
         
-         ξ=ξ_new; τ2=τ2_new;el0=el1;βhat=Badj.β̂
+         ξ[:]=ξ_new; τ2[:]=τ2_new;el0=el1;βhat[:]=Badj.β̂
         
           numitr +=1        
     end
@@ -641,7 +641,7 @@ function emGLM(L::Int64,y::Vector{Float64},X::Matrix{Float64},X₀::Matrix{Float
      
          crit=abs(el1-el0)
          
-         ξ=ξ_new;σ0=σ0_new;el0=el1;A0[:,:]=A1;B0[:,:]=B1
+         ξ[:]=ξ_new;σ0[:]=σ0_new;el0=el1;A0[:,:]=A1;B0[:,:]=B1
         
           numitr +=1
         
