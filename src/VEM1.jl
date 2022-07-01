@@ -40,7 +40,7 @@ function intβOut(Xy₀::Vector{Float64},yt::Vector{Float64},Xt₀::Matrix{Float
     c=size(Xt₀,2); beta=zeros(c); tD=copy(Xt₀'); M=zeros(n,n)
     Vβ̂inv = zeros(c,c)
     λ= Lambda.(ξ) #2Lambda
-
+  
     # Xy₀=getXy('T',Xt₀,yt) #X₀'y
     
     # Vβ̂inv= inv(Σ₀)+ BLAS.gemm('N','N',rmul!(tD,λ),Xt₀)  # Σ₀^-₁ +(tD=X₀'*λ)*X₀ :precision Σᵦ
@@ -48,7 +48,7 @@ function intβOut(Xy₀::Vector{Float64},yt::Vector{Float64},Xt₀::Matrix{Float
     Vβ̂inv[:,:]= inv(Σ₀)+ symXX('N',rmul!(tD,Λ)) #forcing to be symmetric
     rmul!(tD,Λ)
     intB!(beta,M,Vβ̂inv,Xy₀,tD,Xt₀)
-   
+    # display(beta)
     Ŷ= yt- getXy('T',tD,beta)      # yt - λX₀β̂
     
      return  intOut(Vβ̂inv,beta,Ŷ,λ,tD,M)
@@ -332,7 +332,7 @@ function emNull(yt,Xt₀,S,τ2,ξ,Σ₀;tol::Float64=1e-4)
          crit=abs(el1-el0)
         #  crit=norm(ξ_new-ξ)+norm(τ2_new-τ2)+abs(el1-el0)  
         
-         ξ=ξ_new; τ2=τ2_new;el0=el1;βhat=Badj.β̂
+         ξ[:]=ξ_new; τ2[:]=τ2_new;el0=el1;βhat[:]=Badj.β̂
         
           numitr +=1        
     end
@@ -457,7 +457,7 @@ function emAlt(yt,Xt,Xt₀,S,τ2,σ0::Float64,ξ,Σ₀,n::Int64,c::Int64;tol::Fl
          crit=abs(el1-el0)
         #  crit=norm(ξ_new-ξ)+norm(τ2_new-τ2)+abs(el1-el0)  
         
-         ξ=ξ_new; τ2=τ2_new;el0=el1;σ0=σ0_new;βhat=Badj.β̂
+         ξ[:]=ξ_new; τ2[:]=τ2_new;el0=el1;σ0[:]=σ0_new;βhat[:]=Badj.β̂
         
           numitr +=1        
     end
@@ -556,7 +556,7 @@ function emSusie(yt,Xt,Xt₀,S,τ2,σ0::Vector{Float64},ξ,Σ₀,Π::Vector{Floa
          crit=abs(el1-el0)
         #  crit=norm(ξ_new-ξ)+norm(τ2_new-τ2)+abs(el1-el0)  
         
-         ξ=ξ_new; τ2=τ2_new;el0=el1;σ0=σ0_new;βhat=Badj.β̂;
+         ξ[:]=ξ_new; τ2[:]=τ2_new;el0=el1;σ0[:]=σ0_new;βhat[:]=Badj.β̂;
          A0[:,:]=A1;B0[:,:]=B1
         
           numitr +=1        
@@ -581,23 +581,22 @@ end
 """
 function glmmSusie(y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float64},Vector{Float64}},T::Matrix{Float64},
     S::Vector{Float64};tol=1e-4,τ²::Float64 = 1.99,L::Int64=10,Π::Vector{Float64}=ones(size(X,2))/size(X,2),σ0::Vector{Float64} = ones(L))
-
-    n,c=size(X₀); p=size(X,2)
-  # check if covariates are added as input and include the intercept. 
-     if (X₀!= ones(n,1)) 
-         X₀ = hcat(ones(n),X₀)
-     end
-
-      # check the size of prior probabilities
-      if (length(Π)!= size(X,2))
-        println("Error. The length of Π should match $(size(X,2)) SNPs!")
-      end
       
+     n,c=size(X₀); p=size(X,2)
+      # check if covariates are added as input and include the intercept. 
+      if (X₀!= ones(n,1)) 
+        X₀ = hcat(ones(n),X₀)
+       end
+    
+     # check the size of prior probabilities
+      if (length(Π)!= p)
+       println("Error. The length of Π should match $p SNPs!")
+     end
+     
       # transforming data
          Xt, Xt₀, yt = rotate(y,X,X₀,T) 
      
-       # initial values of hyper-prameters
-             
+       # initial values of hyper-prameters        
          Σ0= 2(cov(Xt₀)+I) # initial variance of prior β
          ξ0=guessξ0(yt,Xt₀,Xt,S,Σ0,τ²,σ0,Π,n,L)
 
@@ -621,10 +620,11 @@ end
 function selectQTL(K::Matrix{Float64},y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float64},Vector{Float64}},LOCO::Bool=false
          ;tol=1e-4,τ0::Float64 = 1.99,L::Int64=10,Π::Vector{Float64}=ones(size(X,2))/size(X,2),σ0::Vector{Float64} = ones(L))
 
-
-    T, S = svdK(K;LOCO=LOCO)
+         
+         
+         T, S = svdK(K;LOCO=LOCO)    
     
-    Res = glmmSusie(y,X,X₀,T,S;tol=tol,τ²=τ0,L=L,Π=Π,σ0=σ0)
+          Res = glmmSusie(y,X,X₀,T,S;tol=tol,τ²=τ0,L=L,Π=Π,σ0=σ0)
 
     return Res
 
