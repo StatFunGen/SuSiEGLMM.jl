@@ -8,7 +8,7 @@ Sum of Single Effects model based on Generalized Linear Mixed Model for binary t
 module SuSiEGLMM
 
 
-using Statistics, LinearAlgebra, Random, StatsBase, Distributions, Distributed,DelimitedFiles
+using Statistics, GLM, LinearAlgebra, Random, StatsBase, Distributions, Distributed,DelimitedFiles
 
 ### include function files
 # include("Utilities.jl")

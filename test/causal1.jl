@@ -5,14 +5,14 @@
 
 @everywhere using Revise
 @everywhere using Pkg
-@everywhere Pkg.activate(homedir()*"/GIT/SuSiEGLMM.jl")
+@everywhere Pkg.activate(homedir()*"/GIT/susie-glmm/SuSiEGLMM.jl")
 @everywhere using SuSiEGLMM
 
 
 ### causal1:pop
 @time info=readdlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/causal1/pop/ascertained_pop_12_10.bim");
 @time geno=readdlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/causal1/pop/ascertained_pop_genotype_12_10.txt";header=true);
-@time pheno=readdlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/causal1/pop/ascertained_pop_phenotype_12_10.txt";header=true); #518 x 4000 snps
+@time pheno=readdlm(homedir()*"/GIT/SuSiEGLMM.jl/testdata/causal1/pop/ascertained_pop_phenotype_12_10.txt";header=true); #503 x 4000 snps
 #data1=readdlm("../testdata/fam_100fams_4000snps.txt";header=true)
 
 # covariate: sex
@@ -51,14 +51,14 @@ X = convert(Matrix{Float64},X)
 n,p = size(X)
 # L=3; Π = ones(p)/p
 #score test
-@time Tstat, pval= SuSiEGLMM.scoreTest(K,G,y,X;LOCO=false);
+@time Tstat, pval= scoreTest(K,G,y,X;LOCO=false);
 
     T, S = svdK(K;LOCO=false)
     Xt, Xt₀, yt,init00= initialization(y,X,ones(n,1),T,S;tol=1e-4)
     T0= computeT(init00,yt,Xt₀,Xt)
 
 
-@time Tstat1, pval1= SuSiEGLMM.scoreTest(K1,G,y,X)
+@time Tstat1, pval1= scoreTest(K1,G,y,X)
 
 #susie-glm
 @time est0= fineQTL_glm(G,y,X;tol=1e-4)
@@ -96,27 +96,130 @@ p=size(X,2)
 ######## the same simulation in R-version
 Seed(124)
 
+X1= (X.-mean(X,dims=2))./std(X,dims=2)
+n,p = size(X1)
+ L=1; B=100;τ2=0.1;
 
- L=1; B=100;τ2=0.4;
+#GLMM :score test
+
+# n=100; 
+# p=10; 
+
+# K2=Symmetric(K0)
+b_true=zeros(p);
+b_1s=zeros(B); 
+init0=[]; init1=[]
+Ts=zeros(p,B);
+# tt=zeros(B); Ps=zeros(p,B); 
+ Ts1=zeros(p,B);#Ps1=zeros(p,B);
+
+res=[]
+#add covariates
+# c=3
+
+Y0=zeros(n,B);
+# K=Matrix(1.0I,n,n)
+# T,S = svdK(K;LOCO=false)
+T,S = svdK(K0;LOCO=false)
+# # H=svd(K2);
+
+for j = 1:B
+    b_true[1]= randn(1)[1] 
+    b_1s[j] = b_true[1]   
+    # b_true[1]=b_1s[j]
+    # X=randn(n,p)
+    g=rand(MvNormal(τ2*K0)) #theoretical
+    # g=rand(MvNormal(τ2*K0)) #grm
+    # writedlm("./testdata/dataX-julia.csv",X)
+    # X₀=randn(n,c)
+    # bhat=randn(c)
+    # Y= logistic.(X*b_true+g) .>rand(n) #generating binary outcome
+
+    Y= logistic.(g) .>rand(n)
+    Y1=logistic.(X1*b_true+g) .>rand(n)
+    # Y= logistic.(X1*b_true+g+X₀*bhat) .>rand(n) # random covariates independent of X:95%
+    Y=convert(Vector{Float64},Y)
+    Y1=convert(Vector{Float64},Y1) 
+    # writedlm("./testdata/dataY-julia.csv",Y)
+    # Y0[:,j]=Y1
+    
+    t0=@elapsed begin
+        # Xt, Xt₀, yt,init00= initialization(Y,X1,X₀,T,S;tol=1e-4)
+        # Xt, Xt₀, yt,init00= initialization(Y,X1,ones(n,1),T,S;tol=1e-4)
+ 
+        # Xt, Xt₀, yt,init01= initialization(Y1,X1,ones(n,1),T,S;tol=1e-3)
+        
+        # res= susieGLM(n,L, ones(p)/p,Y1,X1,ones(n,1);tol=1e-3) 
+        # res0= susieGLMM(L,ones(p)/p,Y1,X1,ones(n,1),T,S;tol=1e-3)
+        Xt, Xt₀, yt,init10=gLMM(Y1,X1,ones(n,1),T,S;tol=1e-4)
+        Xt, Xt₀, yt,init00=gLMM(Y,X1,ones(n,1),T,S;tol=1e-4)
+        T1= computeT(init10,yt,Xt₀,Xt)
+        T0= computeT(init00,yt,Xt₀,Xt)
+       
+        # Xt, Xt₀, yt,init=initialization(Y1,X1,ones(n,1),T,S;tol=1e-4)
+    end
+    init0=[init0;init00]
+    init1=[init1;init10]
+    Ts[:,j]=T0;
+    Ts1[:,j]=T1
+    # # Ps[:,j]=ccdf.(Chisq(1),T0); Ps1[:,j]=ccdf.(Chisq(1),T1)
+    # tt[j]=t0
+    # res=[res;res0]
+end
+
+# writedlm("./test/y_causal1_1_pop_grm.txt",Y0)
+for j=1:B
+    Xt, Xt₀, yt,init01= initialization(Y,X,ones(n,1),Matrix(1.0I,n,n),ones(n);tol=1e-4)
+    T1= computeT(init01,yt,Xt₀,Xt)
+    # Xt, Xt₀, yt,init01= initialization(Y1,X1,ones(n,1),T,S;tol=1e-3)
+    # T1= computeT(init01,yt,Xt₀,Xt)
+     init1=[init1;init01]
+# init1=[init1;init01]
+      Ts1[:,j]=T1;
+end
+
+[init0[j].τ2 for j=1:B]
+tα=percentile(maximum(Tscore,dims=1)[1,:],95)
+sum(Tscore1[1,:].>tα)
+
+sum(Ps[1,:].<0.05)
+println("min, median, max times for score test are $(minimum(tt)),$(median(tt)), $(maximum(tt)).")
+println("min median max times for glm are $(minimum(Tm)),$(median(Tm)), $(maximum(Tm)).")
+
+#test glm
+Y= readdlm("./testdata/causal1_pop_Y.csv",',';skipstart=1)[:,1]
+res0= susieGLM(L, ones(p)/p,Y,X1,ones(n,1);tol=1e-3) 
+
+
+#susie-GLMM & glm
 #GLM
 b_true=zeros(p);
 b_1s=zeros(B);
 
-res=[];Tm=zeros(B);
-
+res=[]; #Tm=zeros(B);
+init0=[];Tscore=zeros(p,B)
 for j = 1:B
-    # b_true[1]= randn(1)[1] 
-    # b_1s[j] = b_true[1]
-    b_true[1]=b_1s[j]
+    b_true[1]= randn(1)[1] 
+    b_1s[j] = b_true[1]
+    # b_true[1]=b_1s[j]
     X=randn(n,p)
-    g=rand(MvNormal(τ2*K)) 
-    Y= logistic.(X1*b_true+g) .>rand(n) #generating binary outcome
+    writedlm("./testdata/dataX-julia.csv",X)
+    # g=rand(MvNormal(τ2*K)) 
+    Y= logistic.(X*b_true) .>rand(n) #generating binary outcome
     Y=convert(Vector{Float64},Y)
-    # writedlm("./testdata/dataY-julia.csv",Y)
-    # res0= susieGLM(L, ones(p)/p,Y,X,ones(n,1);tol=1e-4) 
-  t0=@elapsed  res0= fineQTL_glm(G,Y,X1;L=L,tol=1e-4)
-    res=[res;res0]; Tm[j]=t0
+    writedlm("./testdata/dataY-julia.csv",Y)
+    res0= susieGLM(n,L, ones(p)/p,Y,X,ones(n,1);tol=1e-3) 
+#   t0=@elapsed  res0= fineQTL_glm(G,Y,X1;L=L,tol=1e-4)
+    res=[res;res0]; #Tm[j]=t0
+    
+    Xt, Xt₀, yt,init00= initialization(Y,X,ones(n,1),Matrix(1.0I,n,n),ones(n);tol=1e-3)
+        T0= computeT(init00,yt,Xt₀,Xt)
+        init0=[init0;init00]
+        Tscore[:,j]=T0;
 end
+
+
+
 
 b̂ = [res[2j-1].α[1]*res[2j-1].ν[1] for j=1:B]
 α̂ = [res[2j-1].α[1] for j=1:B]
@@ -127,51 +230,8 @@ using UnicodePlots
 scatterplot(b_1s,b̂,xlabel= "True effects", ylabel="Posterior estimate")
 scatterplot(b_1s,α̂, xlabel="True effects",ylabel="pip")
 
-#GLMM :scroe test
 
-# n=100; p=10; 
-X1= (X.-mean(X,dims=2))./std(X,dims=2)
-# K2=Symmetric(K0)
-b_true=zeros(p);
-b_1s=zeros(B); 
-init0=[]; 
-Ps=zeros(p,B); Tscore=zeros(p,B);tt=zeros(B);
-
-
-# # F =cholesky(K2)
-# # f = svd(F.U)
-# # T,S = f.Vt, f.S.^2
-# K0=convert(Matrix{Float64},K0);
-T,S = svdK(K;LOCO=false)
-# # H=svd(K2);
-for j = 1:B
-
-    b_true[1]= randn(1)[1] 
-    b_1s[j] = b_true[1]
-    # b_true[1]=b_1s[j]
-    # X=randn(n,p)
-    g=rand(MvNormal(τ2*K0))
-    # writedlm("./testdata/dataX-julia.csv",X)
-    Y= logistic.(X1*b_true+g) .>rand(n) #generating binary outcome
-    Y=convert(Vector{Float64},Y)
-    # writedlm("./testdata/dataY-julia.csv",Y)
-    
-    Xt, Xt₀, yt,init00= initialization(Y,X1,ones(n,1),T,S;tol=1e-4)
-    T0= computeT(init00,yt,Xt₀,Xt)
-    init0=[init0;init00]
-    Tscore[:,j]=T0
-    Ps[:,j]=ccdf.(Chisq(1),T0)
-#    t0= @elapsed Ts,P0= scoreTest(K0,G,Y,X1;LOCO=false);
-#    Ps[:,j]=P0; tt[j]=t0; Tscore[:,j]=Ts
-end
-
-writedlm("./test/glmm-scoretest.txt",Ps)
-println("min, median, max times for score test are $(minimum(Tscore)),$(median(Tscore)), $(maximum(Tscore)).")
-# [init0[j].τ2 for j=1:B]
-
-#susie-GLMM & glm
-
-
+#susie-glmm
 b_true=zeros(p);
 b_1s=zeros(B); 
 rglm=[];rglmm=[];
@@ -237,4 +297,30 @@ Xt, Xt₀, yt, init0 = initialization(y[:,1],X,ones(n,1),T,S;tol=1e-4)
 b̂1 = maximum(res0.α.*res0.ν;dims=2)
 
 
+# # covariates correlated with X (glmm only)
+# X2=copy(X1)
+# for j = 1:B
 
+#     b_true[1]= randn(1)[1] 
+#     b_1s[j] = b_true[1]
+#     # b_true[1]=b_1s[j]
+#     # X=randn(n,p)
+#     # g=rand(MvNormal(τ2*K)) #theoretical 
+#     g=rand(MvNormal(τ2*K0)) #grm
+#     # writedlm("./testdata/dataX-julia.csv",X)
+#     bhat=randn(1)
+#     X₀=rand(MvNormal([1 .9;.9 1]),n)
+#     X2[:,1] = X₀[1,:]
+   
+#     Y= logistic.(X1*b_true+g+X₀[2,:].*bhat) .>rand(n) 
+#     Y=convert(Vector{Float64},Y)
+#     t0=@elapsed begin
+#     Xt, Xt₀, yt,init00= initialization(Y,X2,X₀[2,:],T,S;tol=1e-4)
+   
+#     T0= computeT(init00,yt,Xt₀,Xt)
+#     end
+#     init0=[init0;init00]
+#     Tscore[:,j]=T0
+#     Ps[:,j]=ccdf.(Chisq(1),T0)
+#     tt[j]=t0
+# end

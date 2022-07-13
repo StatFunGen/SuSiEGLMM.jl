@@ -3,9 +3,10 @@
 export susieGLM, fineQTL_glm
 using GLM
 
-function susieGLM(L::Int64,Π::Vector{Float64},y::Vector{Float64},X::Matrix{Float64},X₀::Union{Matrix{Float64},Vector{Float64}};tol=1e-4)
+function susieGLM(n::Int64,L::Int64,Π::Vector{Float64},y::Vector{Float64},X::Matrix{Float64},
+    X₀::Union{Matrix{Float64},Vector{Float64}};tol=1e-4,maxitr=1000)
   
-    n =size(X₀,1)
+    # n =size(X,1)
     y1= zeros(n)
   
     if(X₀!= ones(n,1)) #&&(size(X₀,2)>1)
@@ -23,7 +24,7 @@ function susieGLM(L::Int64,Π::Vector{Float64},y::Vector{Float64},X::Matrix{Floa
  ξ0 =sqrt.(getXy('N',X.^2.0,ν0)+getXy('N',X₀,β0).^2)
  
 
-    result = emGLM(L,y1,X,X₀,β0,ξ0,σ0,Π;tol=tol)
+    result = emGLM(L,y1,X,X₀,ξ0,σ0,Π;tol=tol,maxitr=maxitr)
         
 return result
 
@@ -52,6 +53,7 @@ Performs SuSiE (Sum of Single Effects model) GLM fine-mapping analysis for a bin
 - `L` : an integer. The number of single effects for SuSiE implementation. Default is `10`.
 - `Π` : a p x 1 vector of prior inclusion probabilities for SuSiE.  Default is `1/p`, where `p = size(X,2)`. If different probabilities are added to SNPs, the length of Π should be `p`.
 - `tol`: tolerance. Default is `1e-4`. 
+- `maxitr` : the maximum number of iteration for a case where the algrithm does not coverge.  Default is `1000`.
 
 # Output
 
@@ -68,22 +70,22 @@ Performs SuSiE (Sum of Single Effects model) GLM fine-mapping analysis for a bin
 
 """
 function fineQTL_glm(G::GenoInfo,y::Vector{Float64},X::Matrix{Float64},
-    X₀::Union{Matrix{Float64},Vector{Float64}}=ones(length(y),1);L::Int64=10,Π::Vector{Float64}=[1/size(X,2)],tol=1e-4)
+    X₀::Union{Matrix{Float64},Vector{Float64}}=ones(length(y),1);L::Int64=10,Π::Vector{Float64}=[1/size(X,2)],tol=1e-4,maxitr=1000)
 
-    Chr=sort(unique(G.chr));
+    Chr=sort(unique(G.chr)); n, p=size(X)
     est= @distributed (vcat) for j= eachindex(Chr)
                  midx= findall(G.chr.== Chr[j])
                   #check size of Π
-                  if (Π==[1/size(X,2)]) #default value
+                  if (Π==[1/p]) #default value
                     m=length(midx)
                     Π1 =ones(m)/m #adjusting πⱼ
-                   elseif (length(Π)!= size(X,2))
-                      println("Error. The length of Π should match $(size(X,2)) SNPs!")
+                   elseif (length(Π)!= p)
+                      println("Error. The length of Π should match $(p) SNPs!")
                    else
                     Π1 = Π[midx]
                  end
 
-                 est0= susieGLM(L,Π1,y,X[:,midx],X₀;tol=tol)
+                 est0= susieGLM(n,L,Π1,y,X[:,midx],X₀;tol=tol,maxitr=maxitr)
                         est0
     end
 

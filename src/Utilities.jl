@@ -103,7 +103,7 @@ end
 
 function rotateY(y::Vector{Float64},T::Matrix{Float64})
     
-    n=length(y)
+    # n=length(y)
     
     #U'X, U'X₀, U'(y-1/2)
     yt= BLAS.gemv('N',T,(y.-0.5))
@@ -138,7 +138,7 @@ function symXX(t::Char,X::Array{Float64,2})
     
    XtX = Symmetric(BLAS.syrk('U',t,1.0,X))
     
-    return XtX
+    return convert(Matrix{Float64},XtX)
     
 end
 
