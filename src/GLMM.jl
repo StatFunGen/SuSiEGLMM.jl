@@ -195,13 +195,13 @@ function Projector!(P₁::Matrix{Float64},W⁻::Vector{Float64},Xt₀::Matrix{Fl
 
 end
 
-# function Bern_est!(p̂::Vector{Float64},W⁻::Vector{Float64},y::Vector{Float64},X₀::Matrix{Float64},T::Matrix{Float64},init0::Approx0)
-function Bern_est!(p̂::Vector{Float64},W⁻::Vector{Float64},init0::Approx0)
+function Bern_est!(p̂::Vector{Float64},W⁻::Vector{Float64},X₀::Matrix{Float64},T::Matrix{Float64},init0::Approx0)
+# function Bern_est!(p̂::Vector{Float64},W⁻::Vector{Float64},init0::Approx0)
      # Bernoulli estimates
-    #  p̂[:] =  (2y.-1.0).*(getXy('N',X₀,init0.β)+getXy('T',T,init0.μ))  #non-tranformed centered y
+     p̂[:] =  (getXy('N',X₀,init0.β)+getXy('T',T,init0.μ))  #non-tranformed centered y
     #  p̂[:] = logistic.(init0.ξ).*exp.(0.5(p̂- init0.ξ))-Lambda.(init0.ξ).*(p̂.^2-init0.ξ.^2)
     #  p̂[:] = exp.(p̂)
-    p̂[:] = logistic.(init0.ξ)
+    # p̂[:] = logistic.(init0.ξ)
      W⁻[:]  = 1.0./(p̂.*(1.0.-p̂)) #invW
 
 end
@@ -250,8 +250,8 @@ function testStats(init0::Approx0,y::Vector{Float64},X::Matrix{Float64},Xt::Matr
     Scr=zeros(p); Vˢ=zeros(p,p)
    
 
-    #   Bern_est!(p̂,W⁻,y,X₀,T,init0)
-      Bern_est!(p̂,W⁻,init0)
+      Bern_est!(p̂,W⁻,X₀,T,init0)
+    #   Bern_est!(p̂,W⁻,init0)
       Projector!(P₁,W⁻,Xt₀,S,init0.τ2[1])
       mScore!(Scr,X,y,p̂)
       mScoreVar!(Vˢ,Xt,P₁)

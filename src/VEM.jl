@@ -14,7 +14,7 @@
 ## integration out version based on "Peter's derivation" in this file 
 
 
-export covarAdj, postG!, emG!, postB!,emB,mStep!,ELBO,emGLMM,emGLM, Result, Approx0, ResGLM
+export covarAdj, postG!, emG!, postB!,emB!,emB,mStep!,ELBO,emGLMM,emGLM, Result, Approx0, ResGLM
 
 
 function intB!(beta::Vector{Float64},M::Matrix{Float64},C::Matrix{Float64},

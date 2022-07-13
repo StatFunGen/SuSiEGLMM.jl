@@ -1,4 +1,4 @@
-export svdK,rotate,logistic,Lambda,Seed, dropCol
+export svdK,rotate,logistic,Lambda,Seed, dropCol,getXX, getXy, symXX, rotateX, rotateY
 
 #Spectral decomposition
 """

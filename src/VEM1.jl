@@ -13,7 +13,7 @@
 
 ## include only integration out of β for glmms (H0 $ H1:QTL)
 
-export intOut,intβOut,emNull,emAlt,glmmNull,glmm1Snp, guessξ0, Approx, scan1SNP, emSusie, glmmSusie, selectQTL
+export intOut1,intβOut,emNull,emAlt,glmmNull,glmm1Snp, guessξ0, Approx, scan1SNP, emSusie, glmmSusie, selectQTL
 
 
 function intB!(beta::Vector{Float64},M::Matrix{Float64},
@@ -35,6 +35,14 @@ struct intOut
  M::Matrix{Float64}
 end
 
+mutable struct intOut1
+    Vβ̂inv::Matrix{Float64}
+    β̂::Vector{Float64}
+    Ŷ::Vector{Float64}
+    λ::Vector{Float64}
+    tD::Matrix{Float64}
+    M::Matrix{Float64}
+   end
 function intβOut(Xy₀::Vector{Float64},yt::Vector{Float64},Xt₀::Matrix{Float64},Σ₀::Matrix{Float64},ξ::Vector{Float64},n::Int64)
     
     c=size(Xt₀,2); beta=zeros(c); tD=copy(Xt₀'); M=zeros(n,n)
@@ -51,7 +59,7 @@ function intβOut(Xy₀::Vector{Float64},yt::Vector{Float64},Xt₀::Matrix{Float
     # display(beta)
     Ŷ= yt- getXy('T',tD,beta)      # yt - λX₀β̂
     
-     return  intOut(Vβ̂inv,beta,Ŷ,λ,tD,M)
+     return  intOut1(Vβ̂inv,beta,Ŷ,λ,tD,M)
 
 end
 
@@ -65,7 +73,7 @@ end
 #E-step
 
 # g for H0: integration out version
-function postG!(ghat::Vector{Float64},Vg::Vector{Float64},Badj::intOut,S::Vector{Float64},τ2::Vector{Float64})
+function postG!(ghat::Vector{Float64},Vg::Vector{Float64},Badj::intOut1,S::Vector{Float64},τ2::Vector{Float64})
     
     Vg[:]= 1.0./(Badj.λ+1.0./(τ2[1]*S))
     # println("pdf of Vg is", isposdef(Vg))
@@ -90,7 +98,7 @@ function postG!(ghat::Vector{Float64},Vg::Vector{Float64},Badj::intOut,
     end
 
 # g for QTL 
-function postG!(ghat::Vector{Float64},Vg::Vector{Float64},Badj::intOut,S::Vector{Float64},τ2::Vector{Float64},Xt::Vector{Float64},b0::Vector{Float64})
+function postG!(ghat::Vector{Float64},Vg::Vector{Float64},Badj::intOut1,S::Vector{Float64},τ2::Vector{Float64},Xt::Vector{Float64},b0::Vector{Float64})
 
     Vg[:]= 1.0./(Badj.λ+ 1.0./(τ2[1]*S))
     
@@ -102,7 +110,7 @@ function postG!(ghat::Vector{Float64},Vg::Vector{Float64},Badj::intOut,S::Vector
 end
 
 #b for QTL
-function postB!(b1::Vector{Float64},σ1::Vector{Float64},Badj::intOut,ghat::Vector{Float64},Xt::Vector{Float64},σ0::Vector{Float64})
+function postB!(b1::Vector{Float64},σ1::Vector{Float64},Badj::intOut1,ghat::Vector{Float64},Xt::Vector{Float64},σ0::Vector{Float64})
         
      Λ=convert(Matrix{Float64},Diagonal(Badj.λ));
     σ1[:].=1.0/(Xt'BLAS.symv('U',Λ,Xt)+1.0/σ0[1])
@@ -155,7 +163,7 @@ function postB!(A1::Matrix{Float64}, B1::Matrix{Float64}, Sig1::Matrix{Float64},
 
 #M-step: H0  (integration out version)
 function mStep!(ξ_new::Vector{Float64},Vg::Vector{Float64},
-        ghat::Vector{Float64},Badj::intOut,Xt₀::Matrix{Float64},n::Int64)
+        ghat::Vector{Float64},Badj::intOut1,Xt₀::Matrix{Float64},n::Int64)
     
     V=zeros(n,n)
     V[:,:]=Diagonal(Vg)
@@ -173,7 +181,7 @@ end
 
 # ξ for QTL : expensive!
 function mStep!(ξ_new::Vector{Float64},b1::Vector{Float64},σ1::Vector{Float64},Vg::Vector{Float64},ghat::Vector{Float64},
-    Badj::intOut,Xt₀::Matrix{Float64},Xt::Vector{Float64},n::Int64)
+    Badj::intOut1,Xt₀::Matrix{Float64},Xt::Vector{Float64},n::Int64)
      
      mu = zeros(n); M1 = zeros(n,n);
      mu[:] = Xt
@@ -190,7 +198,7 @@ function mStep!(ξ_new::Vector{Float64},b1::Vector{Float64},σ1::Vector{Float64}
     ξ_new[:] = sqrt.(ξ_new + getXy('N',M1,ones(n)))
     
     # ξ_new[:]= sqrt.((getXy('N',Xt₀,Badj.β̂)+ getXy('N',I- Badj.M,mu)).^2 
-                # + Diagonal(M1+BLAS.symm('R','U',Diagonal(1.0./Badj.λ)-2Sig,Badj.M)+Sig)*ones(n) )
+    #             + Diagonal(M1+BLAS.symm('R','U',Diagonal(1.0./Badj.λ)-2Sig,Badj.M)+Sig)*ones(n) )
                 
 
 end
@@ -217,7 +225,7 @@ end
 
     
 # For H0 (integration out version)
-function ELBO(ξ_new::Vector{Float64},τ2_new::Vector{Float64},Badj::intOut,ghat::Vector{Float64},
+function ELBO(ξ_new::Vector{Float64},τ2_new::Vector{Float64},Badj::intOut1,ghat::Vector{Float64},
         ghat2::Vector{Float64},Vg::Vector{Float64},S::Vector{Float64},
         Xy₀::Vector{Float64},Σ₀::Matrix{Float64},n::Int64)
    
@@ -237,7 +245,7 @@ function ELBO(ξ_new::Vector{Float64},τ2_new::Vector{Float64},Badj::intOut,ghat
 end
 
 # for QTL
-function ELBO(ξ_new::Vector{Float64},τ2_new::Vector{Float64},σ0_new::Vector{Float64},Badj::intOut,
+function ELBO(ξ_new::Vector{Float64},τ2_new::Vector{Float64},σ0_new::Vector{Float64},Badj::intOut1,
     b1::Vector{Float64},b2::Vector{Float64},σ1::Vector{Float64},ghat::Vector{Float64},
     ghat2::Vector{Float64},Vg::Vector{Float64},S::Vector{Float64},Xt::Vector{Float64},
     Xy₀::Vector{Float64},Σ₀::Matrix{Float64},n::Int64)
@@ -458,7 +466,7 @@ function emAlt(yt,Xt,Xt₀,S,τ2,σ0::Float64,ξ,Σ₀,n::Int64,c::Int64;tol::Fl
         #  crit=norm(ξ_new-ξ)+norm(τ2_new-τ2)+abs(el1-el0)  
         
          ξ[:]=ξ_new; τ2[:]=τ2_new;el0=el1;σ0[:]=σ0_new;βhat[:]=Badj.β̂
-        
+         b0[:]=b1
           numitr +=1        
     end
     println(numitr)
