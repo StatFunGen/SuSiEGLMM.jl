@@ -1,6 +1,7 @@
 # SuSiEGLMM.jl
 Julia package for sum of single effects regression with generalized linear mixed model
 
+**This package was work in progress as an experiment, and is no longer maintained**
 
 
 ### Julia Installation
